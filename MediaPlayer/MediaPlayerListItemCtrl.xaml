@@ -1,0 +1,25 @@
+﻿<UserControl x:Class="MediaPlayer.MediaPlayerListItemCtrl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="40" d:DesignWidth="500">
+
+    <Grid Name="gridMain" Background="White">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition />
+            <ColumnDefinition Width="150" />
+        </Grid.ColumnDefinitions>
+
+        <Image Grid.ColumnSpan="2" Name="imageSelected" Source="c:\apps\themes\picard\images\apps\mediaplayer\mediaplayer_selected_item.png" Stretch="Fill" />
+        <Rectangle Grid.ColumnSpan="2" Name="rectangleAlt" Fill="#FFF3DD" />
+        <TextBlock Name="textBlockTitle" Text="Item" HorizontalAlignment="Left" VerticalAlignment="Center" FontFamily="Arial" FontSize="18" Margin="10,0,0,0" />
+        
+        <Grid Grid.Column="1" Name="gridSelect" MouseDown="gridSelect_MouseDown">
+            <Rectangle Fill="White" Opacity=".01" />
+            <TextBlock Grid.Column="1" Name="textBlockSelect" Text="Select" HorizontalAlignment="Right" VerticalAlignment="Center" FontFamily="Arial" FontSize="18" Margin="0,0,10,0" Foreground="White" />
+        </Grid>
+            
+    </Grid>
+</UserControl>
