@@ -12,6 +12,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 
+using MediaPlayer.Common;
+
 namespace MediaPlayer
 {
     /// <summary>
@@ -22,6 +24,18 @@ namespace MediaPlayer
         public MainWindow()
         {
             InitializeComponent();
+
+            Loaded += new RoutedEventHandler(MainWindow_Loaded);
+            Closed += new EventHandler(MainWindow_Closed);
+        }
+
+        void MainWindow_Closed(object sender, EventArgs e)
+        {
+            mediaPlayerListCtrl.StopControl();
+        }
+
+        void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
         }
     }
 }
