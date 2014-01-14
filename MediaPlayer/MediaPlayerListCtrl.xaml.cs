@@ -13,6 +13,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 
 using MediaPlayer.Common;
+using MediaPlayer.Managers;
 
 namespace MediaPlayer
 {
@@ -35,18 +36,24 @@ namespace MediaPlayer
             _totalItems = 0;
 
             Loaded += new RoutedEventHandler(MediaPlayerListCtrl_Loaded);
-            PortableDeviceHelper.Instance.LoadedCompleted += new EventHandler(Instance_LoadedCompleted);
+
+            MediaContentManager.Instance.MediaFound += new EventHandler(Instance_MediaFound);            
         }
 
         void MediaPlayerListCtrl_Loaded(object sender, RoutedEventArgs e)
         {
-            PortableDeviceHelper.Instance.LoadPortableDevice();
-/*
-            foreach (string deviceName in PortableDeviceHelper.Instance.DeviceList)
-            {
-                System.Diagnostics.Debug.WriteLine(string.Format("Device Firendly Name = {0}", deviceName));
-            }
-*/
+
+        }
+
+        void Instance_MediaFound(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new EventHandler(SAFE_Instance_MediaFound), sender, e);
+        }
+
+        void SAFE_Instance_MediaFound(object sender, EventArgs e)
+        {
+            MediaContentManager.Instance.Stop();
+            ShowAudio();
         }
 
         void Instance_LoadedCompleted(object sender, EventArgs e)
@@ -61,13 +68,14 @@ namespace MediaPlayer
 
         private void ShowAudio()
         {
-            ShowContent();
+            if (MediaContentManager.Instance.IsMusicFilesFound)
+                ShowContent(MediaContentManager.Instance.MusicPlayList);
         }
 
-        private void ShowContent()
+        private void ShowContent(List<PortableDevice.PortableDeviceObject> PlayList)
         {
             _selectedIndex = -1;
-            _totalItems = PortableDeviceHelper.Instance.VideoList.Count;
+            _totalItems = PlayList.Count;
 
             if (_totalItems <= 0)
                 return;
@@ -80,10 +88,11 @@ namespace MediaPlayer
 
             bool isAlt = false;
             int index = 0;
-            foreach (string name in PortableDeviceHelper.Instance.MusicList)
+
+            foreach (PortableDevice.PortableDeviceObject obj in PlayList)
             {
                 MediaPlayerListItemCtrl listItem = new MediaPlayerListItemCtrl();
-                listItem.FileName = name;
+                listItem.FileName = obj.Name;
                 listItem.ListItemSelect += new EventHandler(listItem_ListItemSelect);
                 listItem.ListItemHighlight += new EventHandler(listItem_ListItemHighlight);
                 listItem.IsAlt = isAlt;
@@ -111,6 +120,12 @@ namespace MediaPlayer
 
                 listItem.IsSelected = true;
                 _selectedIndex = listItem.Index;
+
+                double offset = (scrollViewerItems.VerticalOffset / scrollViewerItems.ViewportHeight) * scrollViewerItems.ViewportHeight;
+
+                scrollViewerItems.ScrollToVerticalOffset(offset);
+
+                System.Diagnostics.Debug.WriteLine(string.Format("ViewportHeight = {0}", scrollViewerItems.ViewportHeight));
             }
         }
 
@@ -119,13 +134,79 @@ namespace MediaPlayer
             if (sender is MediaPlayerListItemCtrl)
             {
                 MediaPlayerListItemCtrl listItem = sender as MediaPlayerListItemCtrl;
+
+                if (ItemSelectionHandler != null)
+                    ItemSelectionHandler(listItem.FileName);
+
+                double offset = (scrollViewerItems.VerticalOffset / scrollViewerItems.ViewportHeight) * scrollViewerItems.ViewportHeight;
+
+                scrollViewerItems.ScrollToVerticalOffset(offset);
             }
+        }
+
+        public void MoveNext()
+        {
+            UpdateContent(true);
+        }
+
+        public void MovePrevious()
+        {
+            UpdateContent(false);
+        }
+
+        private void UpdateContent(bool next)
+        {
+            if (_totalItems <= 0)
+                return;
+
+            if (_selectedIndex != -1)
+            {
+                MediaPlayerListItemCtrl selectedListItem = (MediaPlayerListItemCtrl)stackPanelItems.Children[_selectedIndex];
+                selectedListItem.IsSelected = false;
+            }
+
+            if (_selectedIndex == -1)
+            {
+                _selectedIndex = 0;
+            }
+            else
+            {
+                if (next)
+                    _selectedIndex++;
+                else
+                    _selectedIndex--;
+            }
+
+            if (_selectedIndex >= _totalItems)
+                _selectedIndex = 0;
+
+            if (_selectedIndex < 0)
+                _selectedIndex = _totalItems - 1;
+
+            MediaPlayerListItemCtrl listItem = (MediaPlayerListItemCtrl)stackPanelItems.Children[_selectedIndex];
+            listItem.IsSelected = true;
+
+            if (ItemSelectionHandler != null)
+                ItemSelectionHandler(listItem.FileName);
+
+            int multiple = (int)(_selectedIndex * listItem.ActualHeight) / (int)(400 - imageTitle.ActualHeight);
+            double offset = multiple * (400 - imageTitle.ActualHeight);
+
+            scrollViewerItems.ScrollToVerticalOffset(offset);
+            System.Diagnostics.Debug.WriteLine(string.Format("ViewportHeight = {0}", stackPanelItems.VerticalOffset));
         }
 
         public void StopControl()
         {
-            PortableDeviceHelper.Instance.LoadedCompleted -= Instance_LoadedCompleted;
-            PortableDeviceHelper.Instance.Stop();
+            MediaContentManager.Instance.MediaFound -= Instance_MediaFound;
+            MediaContentManager.Instance.Stop();
+//            PortableDeviceHelper.Instance.LoadedCompleted -= Instance_LoadedCompleted;
+//            PortableDeviceHelper.Instance.Stop();
+        }
+
+        private void ScrollToItem(MediaPlayerListItemCtrl item)
+        {
+        
         }
     }
 }

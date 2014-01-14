@@ -55,6 +55,12 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Data\PortableDevices.cs" />
+    <Compile Include="Managers\MediaContentManager.cs" />
+    <Compile Include="Settings\Media.cs" />
+    <Compile Include="Windows\WinMediaPlayer.xaml.cs">
+      <DependentUpon>WinMediaPlayer.xaml</DependentUpon>
+    </Compile>
     <Page Include="Controls\ThreeStateButton.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -68,7 +74,6 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Common\BitmapImageHelper.cs" />
-    <Compile Include="Common\PortableDeviceHelper.cs" />
     <Compile Include="Controls\ThreeStateButton.xaml.cs">
       <DependentUpon>ThreeStateButton.xaml</DependentUpon>
     </Compile>
@@ -88,6 +93,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="Windows\WinMediaPlayer.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="MediaPlayerListCtrl.xaml.cs">
@@ -99,7 +108,6 @@
     <Compile Include="MediaPlayerPlayCtrl.xaml.cs">
       <DependentUpon>MediaPlayerPlayCtrl.xaml</DependentUpon>
     </Compile>
-    <Compile Include="MediaServer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>

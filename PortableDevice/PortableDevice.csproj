@@ -41,6 +41,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MediaServer.cs" />
     <Compile Include="PortableDevice.cs" />
     <Compile Include="PortableDeviceCollection.cs" />
     <Compile Include="PortableDeviceFile.cs" />

@@ -12,7 +12,7 @@
             <RowDefinition />
         </Grid.RowDefinitions>
 
-        <Image Grid.Row="0" Source="c:\apps\themes\picard\images\apps\mediaplayer\mediaplayer_title_bar.png" Stretch="Fill" />
+        <Image Name="imageTitle"  Grid.Row="0" Source="c:\apps\themes\picard\images\apps\mediaplayer\mediaplayer_title_bar.png" Stretch="Fill" />
         <TextBlock Grid.Row="0" Text="Media Player" Name="textBlockTitle" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Arial" FontSize="20" />
         
         <TextBlock Grid.Row="0" Text="" Name="textBlockFileCount" Foreground="White" HorizontalAlignment="Right" VerticalAlignment="Bottom" FontFamily="Arial" FontSize="12" Margin="2" />

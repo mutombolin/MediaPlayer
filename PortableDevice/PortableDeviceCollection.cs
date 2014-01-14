@@ -34,6 +34,7 @@ namespace PortableDevice
             foreach (var deviceId in deviceIds)
             {
                 Add(new PortableDevice(deviceId));
+                System.Diagnostics.Debug.WriteLine(string.Format("deviceId = {0}", deviceId));
             }
         }
     }

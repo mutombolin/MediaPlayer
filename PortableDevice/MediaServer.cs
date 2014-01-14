@@ -10,21 +10,30 @@ using System.Threading;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace MediaPlayer
+using PortableDeviceApiLib;
+using PortableDeviceTypesLib;
+
+using _tagpropertykey = PortableDeviceApiLib._tagpropertykey;
+using IPortableDeviceKeyCollection = PortableDeviceApiLib.IPortableDeviceKeyCollection;
+using IPortableDeviceValues = PortableDeviceApiLib.IPortableDeviceValues;
+using System.Runtime.InteropServices;
+
+namespace PortableDevice
 {
     public class MediaServer
     {
         private HttpListener _listener;
         private string _filename = string.Empty;
-        private bool _isStop = false;
         private bool _isStarted = false;
         private Thread _requestThread;
         private bool _isStopping = false;
         private int _numberOfRequest;
+        private System.Runtime.InteropServices.ComTypes.IStream _sourceStream;
 
         private ManualResetEvent resetEvent;
 
-        private MemoryStream _ms;
+        private PortableDevice _device;
+        private PortableDeviceFile _file;
 
         public MediaServer()
         {
@@ -54,16 +63,13 @@ namespace MediaPlayer
         {
             lock (this)
             {
-                if (_isStopping)
-                    return;
-
                 resetEvent.Reset();
                 _numberOfRequest++;
             }
 
             var listener = ar.AsyncState as HttpListener;
 
-            //            System.Diagnostics.Debug.WriteLine(string.Format("ListenerCallback numberOfRequest = {0}", _numberOfRequest));
+            System.Diagnostics.Debug.WriteLine(string.Format("ListenerCallback numberOfRequest = {0}", _numberOfRequest));
 
             _isStarted = true;
 
@@ -71,28 +77,17 @@ namespace MediaPlayer
 
             System.Threading.Tasks.Task.Factory.StartNew((ctx) =>
             {
-                _isStop = false;
                 WriteFile((HttpListenerContext)ctx);
             }, context, System.Threading.Tasks.TaskCreationOptions.LongRunning);
-
-            lock (this)
-            {
-                if (--_numberOfRequest == 0)
-                    resetEvent.Set();
-            }
         }
 
         public void Stop()
         {
-            lock (this)
-            {
+            if (_isStarted)
                 _isStopping = true;
-            }
 
-            resetEvent.WaitOne(1000);
-            _isStopping = false;
-            System.Diagnostics.Debug.WriteLine("Listener Stopped");
             _isStarted = false;
+            System.Diagnostics.Debug.WriteLine("Listener Stopped");
         }
 
         public void Dispose()
@@ -117,6 +112,7 @@ namespace MediaPlayer
             _requestThread.Start();
 
             _numberOfRequest = 0;
+            _sourceStream = null;
         }
 
         public bool IsStarted
@@ -127,20 +123,52 @@ namespace MediaPlayer
             }
         }
 
+        private static IntPtr ReadBuffer;
+
+        private static int IStreamRead(System.Runtime.InteropServices.ComTypes.IStream stream, byte[] buffer)
+        {
+            if (ReadBuffer == IntPtr.Zero)
+                ReadBuffer = Marshal.AllocCoTaskMem(Marshal.SizeOf(typeof(int)));
+
+            stream.Read(buffer, buffer.Length, ReadBuffer);
+
+            return Marshal.ReadInt32(ReadBuffer);
+        }
+
         void WriteFile(HttpListenerContext ctx)
         {
-            var response = ctx.Response;
-
-            if ((_ms == null) || (!_ms.CanRead))
+            if ((this._device == null) || (this._file == null))
                 return;
 
-            MemoryStream newMs = new MemoryStream(_ms.GetBuffer());
-            newMs.Position = 0;
+            while (_sourceStream != null)
+                Thread.Sleep(100);
 
-            using (newMs)
+            try
             {
-                System.Diagnostics.Debug.WriteLine(string.Format("Length = {0}", newMs.Length));
-                response.ContentLength64 = newMs.Length;
+                var response = ctx.Response;
+
+                PortableDevice device = this._device;
+                PortableDeviceFile file = this._file;
+
+                device.Connect();
+
+                IPortableDeviceContent content;
+                device.PortableDeviceClass.Content(out content);
+
+                IPortableDeviceResources resources;
+                content.Transfer(out resources);
+
+                PortableDeviceApiLib.IStream wpdStream;
+                uint optimalTransferSize = 0;
+
+                var property = new _tagpropertykey();
+                property.fmtid = new Guid(0xE81E79BE, 0x34F0, 0x41BF, 0xB5, 0x3F, 0xF1, 0xA0, 0x6A, 0xE8, 0x78, 0x42);
+                property.pid = 0;
+
+                resources.GetStream(file.Id, ref property, 0, ref optimalTransferSize, out wpdStream);
+                _sourceStream = (System.Runtime.InteropServices.ComTypes.IStream)wpdStream;
+
+                response.ContentLength64 = 0;
                 response.SendChunked = true;
                 response.ContentType = System.Net.Mime.MediaTypeNames.Application.Octet;
                 response.AddHeader("Content-disposition", "attachment; filename=1.mp4");
@@ -148,34 +176,37 @@ namespace MediaPlayer
                 byte[] buffer = new byte[64 * 1024];
                 int read;
                 int Count = 0;
-                //                long ticks = 0;
-                //                long oldTicks = 0;
-
-                newMs.Position = 0;
 
                 using (BinaryWriter bw = new BinaryWriter(response.OutputStream))
                 {
-                    while ((read = newMs.Read(buffer, 0, buffer.Length)) > 0)
+                    do
                     {
+                        read = IStreamRead(_sourceStream, buffer);
+
                         try
                         {
                             bw.Write(buffer, 0, read);
                             bw.Flush();
                             Count += read;
-                            //                            ticks = DateTime.Now.Ticks;
-                            //                            System.Diagnostics.Debug.WriteLine(string.Format("Ticks = {0}", ticks - oldTicks));
-                            //                            oldTicks = ticks;
                         }
                         catch (Exception ex)
                         {
-                            System.Diagnostics.Debug.WriteLine(string.Format("Exception - error = {0}", ex));
+                            System.Diagnostics.Debug.WriteLine(string.Format("{0} {1} {2}",
+                                System.Reflection.Assembly.GetExecutingAssembly().GetName().Name,
+                                ex,
+                                "MediaServer - BinaryWriter Exception!"));
                         }
 
-                        if (_isStop)
-                        {
+                        if (_isStopping)
                             break;
-                        }
-                    }
+                    } while (read > 0);
+
+                    _sourceStream.Commit(0);
+                    _sourceStream = null;
+
+                    if (_isStopping)
+                        _isStopping = false;
+
                     try
                     {
                         bw.Close();
@@ -190,6 +221,16 @@ namespace MediaPlayer
                 response.StatusCode = (int)HttpStatusCode.OK;
                 response.StatusDescription = "OK";
                 response.OutputStream.Close();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(string.Format("{0} {1} {2}",
+                    System.Reflection.Assembly.GetExecutingAssembly().GetName().Name,
+                    ex,
+                    "MediaServer WriteFile Exception!"));
+            }
+            finally
+            {
             }
         }
 
@@ -206,15 +247,27 @@ namespace MediaPlayer
             }
         }
 
-        public MemoryStream memoryStream
+        public PortableDevice Device
         {
             set
             {
-                _ms = value;
+                _device = value;
             }
             get
             {
-                return _ms;
+                return _device;
+            }
+        }
+
+        public PortableDeviceFile FileObject
+        {
+            set
+            {
+                _file = value;
+            }
+            get
+            {
+                return _file;
             }
         }
     }

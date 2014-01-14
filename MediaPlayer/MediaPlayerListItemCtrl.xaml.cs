@@ -45,7 +45,8 @@ namespace MediaPlayer
 
         private void gridSelect_MouseDown(object sender, MouseButtonEventArgs e)
         {
-
+            if (ListItemSelect != null)
+                ListItemSelect(this, new EventArgs());
         }
 
         public bool IsAlt
