@@ -23,6 +23,7 @@ namespace MediaPlayer
         private int _index;
         private bool _isSelected;
         private bool _isAlt;
+        private PortableDevice.PortableDeviceObject _object;
 
         public event EventHandler ListItemSelect;
         public event EventHandler ListItemHighlight;
@@ -110,6 +111,12 @@ namespace MediaPlayer
         {
             set { _index = value; }
             get { return _index; }
+        }
+
+        public PortableDevice.PortableDeviceObject PortableObject
+        {
+            set { _object = value; }
+            get { return _object; }
         }
     }
 }

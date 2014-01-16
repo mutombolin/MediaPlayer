@@ -11,9 +11,11 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Windows.Interop;
 
 using MediaPlayer.Common;
 using MediaPlayer.Managers;
+using MediaPlayer.Windows;
 
 namespace MediaPlayer
 {
@@ -22,10 +24,14 @@ namespace MediaPlayer
     /// </summary>
     public partial class MediaPlayerListCtrl : UserControl
     {
+        private const string SELECTED_IMAGE = "c:\\apps\\themes\\picard\\images\\apps\\mediaplayer\\mediaplayer_selected.png";
+        private const string UNSELECTED_IMAGE = "c:\\apps\\themes\\picard\\images\\apps\\mediaplayer\\mediaplayer_unselected.png";
+
+        private bool _inAudio = false;
         private int _selectedIndex;
         private int _totalItems;
 
-        public delegate void ItemSelection(string filename);
+        public delegate void ItemSelection(PortableDevice.PortableDeviceObject obj, MediaFileType mediaFileType);
         public event ItemSelection ItemSelectionHandler;
 
         public MediaPlayerListCtrl()
@@ -37,12 +43,36 @@ namespace MediaPlayer
 
             Loaded += new RoutedEventHandler(MediaPlayerListCtrl_Loaded);
 
-            MediaContentManager.Instance.MediaFound += new EventHandler(Instance_MediaFound);            
+            MediaContentManager.Instance.ScanningMedia += new EventHandler(Instance_ScanningMedia);
+            MediaContentManager.Instance.NoMediaFound += new EventHandler(Instance_NoMediaFound);
+            MediaContentManager.Instance.MediaFound += new EventHandler(Instance_MediaFound);
+            MediaContentManager.Instance.UpdateMedia += new EventHandler(Instance_UpdateMedia);
         }
 
         void MediaPlayerListCtrl_Loaded(object sender, RoutedEventArgs e)
         {
+            HwndSource hwnd = (HwndSource)HwndSource.FromVisual(this);
+            WinMediaPlayer.Instance.HWNDParent = hwnd.Handle;
+        }
 
+        void Instance_ScanningMedia(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new EventHandler(SAFE_Instance_ScanningMedia), sender, e);
+        }
+
+        private void SAFE_Instance_ScanningMedia(object sender, EventArgs e)
+        {
+            ShowMessage("Media found, scanning drive...");
+        }
+
+        void Instance_NoMediaFound(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new EventHandler(SAFE_Instance_NoMediaFound), sender, e);
+        }
+
+        private void SAFE_Instance_NoMediaFound(object sender, EventArgs e)
+        {
+            ShowMessage("Searching for media...");
         }
 
         void Instance_MediaFound(object sender, EventArgs e)
@@ -52,24 +82,71 @@ namespace MediaPlayer
 
         void SAFE_Instance_MediaFound(object sender, EventArgs e)
         {
-            MediaContentManager.Instance.Stop();
-            ShowAudio();
+//            MediaContentManager.Instance.Stop();
+            System.Diagnostics.Debug.WriteLine("SAFE_Instance_MediaFound");
+
+            if (MediaContentManager.Instance.MusicPlayList.Count > 0)
+                _inAudio = true;
+            else
+                _inAudio = false;
+
+            if (_inAudio)
+                ShowAudio();
+            else
+                ShowVideo();
         }
 
-        void Instance_LoadedCompleted(object sender, EventArgs e)
+        void Instance_UpdateMedia(object sender, EventArgs e)
         {
-            Dispatcher.BeginInvoke(new EventHandler(SAFE_Instance_LoadedCompleted), sender, e);
+            Dispatcher.BeginInvoke(new EventHandler(SAFE_Instance_UpdateMedia), sender, e);
         }
 
-        void SAFE_Instance_LoadedCompleted(object sender, EventArgs e)
+        private void SAFE_Instance_UpdateMedia(object sender, EventArgs e)
         {
-            ShowAudio();        
+            ContentClear();
+            ShowMessage("Searching for media...");
+        }
+
+        private void ContentClear()
+        {
+            stackPanelItems.Children.Clear();
         }
 
         private void ShowAudio()
         {
-            if (MediaContentManager.Instance.IsMusicFilesFound)
+            _inAudio = true;
+            SwapImage(imageVideo, UNSELECTED_IMAGE);
+            SwapImage(imageAudio, SELECTED_IMAGE);
+
+            if (MediaContentManager.Instance.IsSearching)
+                ShowMessage("Please wait, searching for audio...");
+            else if (MediaContentManager.Instance.IsMusicFilesFound)
                 ShowContent(MediaContentManager.Instance.MusicPlayList);
+            else
+                ShowMessage("Searching for media...");
+        }
+
+        private void ShowVideo()
+        {
+            _inAudio = false;
+            SwapImage(imageAudio, UNSELECTED_IMAGE);
+            SwapImage(imageVideo, SELECTED_IMAGE);
+
+            if (MediaContentManager.Instance.IsSearching)
+                ShowMessage("Please wait, searching for video...");
+            else if (MediaContentManager.Instance.IsVideoFilesFound)
+                ShowContent(MediaContentManager.Instance.VideoPlayList);
+            else
+                ShowMessage("Searching for media...");
+        }
+
+        private void ShowMessage(string message)
+        {
+            textBlockMessage.Text = message;
+            textBlockMessage.Visibility = System.Windows.Visibility.Visible;
+
+            scrollViewerItems.Visibility = System.Windows.Visibility.Hidden;
+            textBlockFileCount.Visibility = System.Windows.Visibility.Hidden;
         }
 
         private void ShowContent(List<PortableDevice.PortableDeviceObject> PlayList)
@@ -78,8 +155,10 @@ namespace MediaPlayer
             _totalItems = PlayList.Count;
 
             if (_totalItems <= 0)
+            {
+                ShowMessage("No files found");
                 return;
-
+            }
             textBlockFileCount.Visibility = System.Windows.Visibility.Visible;
 
             scrollViewerItems.Visibility = System.Windows.Visibility.Visible;
@@ -98,6 +177,7 @@ namespace MediaPlayer
                 listItem.IsAlt = isAlt;
                 listItem.Index = index++;
                 isAlt = !isAlt;
+                listItem.PortableObject = obj;
 
                 stackPanelItems.Children.Add(listItem);
             }
@@ -121,11 +201,7 @@ namespace MediaPlayer
                 listItem.IsSelected = true;
                 _selectedIndex = listItem.Index;
 
-                double offset = (scrollViewerItems.VerticalOffset / scrollViewerItems.ViewportHeight) * scrollViewerItems.ViewportHeight;
-
-                scrollViewerItems.ScrollToVerticalOffset(offset);
-
-                System.Diagnostics.Debug.WriteLine(string.Format("ViewportHeight = {0}", scrollViewerItems.ViewportHeight));
+                ScrollToItem(listItem);
             }
         }
 
@@ -136,11 +212,7 @@ namespace MediaPlayer
                 MediaPlayerListItemCtrl listItem = sender as MediaPlayerListItemCtrl;
 
                 if (ItemSelectionHandler != null)
-                    ItemSelectionHandler(listItem.FileName);
-
-                double offset = (scrollViewerItems.VerticalOffset / scrollViewerItems.ViewportHeight) * scrollViewerItems.ViewportHeight;
-
-                scrollViewerItems.ScrollToVerticalOffset(offset);
+                    ItemSelectionHandler(listItem.PortableObject, _inAudio ? MediaFileType.Audio : MediaFileType.Video);
             }
         }
 
@@ -187,13 +259,9 @@ namespace MediaPlayer
             listItem.IsSelected = true;
 
             if (ItemSelectionHandler != null)
-                ItemSelectionHandler(listItem.FileName);
+                ItemSelectionHandler(listItem.PortableObject, _inAudio ? MediaFileType.Audio : MediaFileType.Video);
 
-            int multiple = (int)(_selectedIndex * listItem.ActualHeight) / (int)(400 - imageTitle.ActualHeight);
-            double offset = multiple * (400 - imageTitle.ActualHeight);
-
-            scrollViewerItems.ScrollToVerticalOffset(offset);
-            System.Diagnostics.Debug.WriteLine(string.Format("ViewportHeight = {0}", stackPanelItems.VerticalOffset));
+            ScrollToItem(listItem);
         }
 
         public void StopControl()
@@ -206,7 +274,50 @@ namespace MediaPlayer
 
         private void ScrollToItem(MediaPlayerListItemCtrl item)
         {
-        
+            var point = item.TranslatePoint(new Point(), stackPanelItems);
+
+            double itemOffsetTop = point.Y;
+            double itemOffsetBottom = point.Y + item.ActualHeight;
+            double offset = 0;
+            bool needUpdate = false;
+
+            if (itemOffsetBottom > (scrollViewerItems.ContentVerticalOffset + scrollViewerItems.ViewportHeight - item.ActualHeight))
+            {
+                offset = itemOffsetBottom - scrollViewerItems.ViewportHeight + item.ActualHeight;
+                needUpdate = true;
+            }
+            else if (itemOffsetTop < scrollViewerItems.ContentVerticalOffset)
+            {
+                offset = itemOffsetTop;
+                needUpdate = true;
+            }
+
+            if (needUpdate)
+                scrollViewerItems.ScrollToVerticalOffset(offset);
+        }
+
+        private void gridAudio_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_inAudio)
+                return;
+
+            ShowAudio();
+        }
+
+        private void gridVideo_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!_inAudio)
+                return;
+
+            ShowVideo();
+        }
+
+        private void SwapImage(Image sourceImage, string imagePath)
+        {
+            if (System.IO.File.Exists(imagePath))
+            {
+                sourceImage.Source = BitmapImageHelper.NewBitmapImage(new Uri(imagePath, UriKind.RelativeOrAbsolute));
+            }
         }
     }
 }

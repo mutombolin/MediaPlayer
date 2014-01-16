@@ -61,11 +61,14 @@ namespace PortableDevice
 
         private void ListenerCallback(IAsyncResult ar)
         {
-            lock (this)
+/*            lock (this)
             {
                 resetEvent.Reset();
                 _numberOfRequest++;
             }
+*/
+            while (_isStopping)
+                Thread.Sleep(100);
 
             var listener = ar.AsyncState as HttpListener;
 
@@ -79,13 +82,27 @@ namespace PortableDevice
             {
                 WriteFile((HttpListenerContext)ctx);
             }, context, System.Threading.Tasks.TaskCreationOptions.LongRunning);
+/*
+            lock (this)
+            {
+                if (--_numberOfRequest == 0)
+                    resetEvent.Set();
+            }
+*/
         }
 
         public void Stop()
         {
+/*            lock (this)
+            {
+                _isStopping = true;
+            }
+*/
+//            if (_isStarted)
+//                resetEvent.WaitOne();
+
             if (_isStarted)
                 _isStopping = true;
-
             _isStarted = false;
             System.Diagnostics.Debug.WriteLine("Listener Stopped");
         }
@@ -204,8 +221,7 @@ namespace PortableDevice
                     _sourceStream.Commit(0);
                     _sourceStream = null;
 
-                    if (_isStopping)
-                        _isStopping = false;
+                    _isStopping = false;
 
                     try
                     {
@@ -231,6 +247,7 @@ namespace PortableDevice
             }
             finally
             {
+                _isStarted = false;
             }
         }
 

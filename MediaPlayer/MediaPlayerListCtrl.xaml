@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             Name="MediaPlayListCtrl"
              mc:Ignorable="d" 
              d:DesignHeight="400" d:DesignWidth="400">
 
@@ -22,6 +23,16 @@
         <ScrollViewer Name="scrollViewerItems" Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" PanningMode="VerticalOnly">
             <StackPanel Name="stackPanelItems" Orientation="Vertical" />
         </ScrollViewer>
+        
+        <Grid Grid.Row="1" Name="gridAudio" Height="45" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,150,0" MouseDown="gridAudio_MouseDown" Visibility="Visible">
+            <Image Name="imageAudio" Source="c:\apps\themes\picard\images\apps\mediaplayer\mediaplayer_unselected.png" />
+            <TextBlock Name="textBlockAudio" Text="Audio" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Arial" FontSize="18" />
+        </Grid>
+        
+        <Grid Grid.Row="1" Name="gridVideo" Height="45" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="150,0,0,0" MouseDown="gridVideo_MouseDown" Visibility="Visible">
+            <Image Name="imageVideo" Source="c:\apps\themes\picard\images\apps\mediaplayer\mediaplayer_unselected.png" />
+            <TextBlock Name="textBlockVideo" Text="Video" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Arial" FontSize="18" />
+        </Grid>
             
     </Grid>
 </UserControl>

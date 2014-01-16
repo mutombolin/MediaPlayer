@@ -55,9 +55,10 @@
         <common:ThreeStateButton Grid.Row="2" x:Name="buttonBack" HorizontalAlignment="Center" VerticalAlignment="Center" Height="78" Margin="0,0,200,0" UpImage="c:\apps\themes\picard\images\apps\mediaplayer\mediaplayer_back_up.png" DownImage="c:\apps\themes\picard\images\apps\mediaplayer\mediaplayer_back_down.png" ButtonClick="buttonBack_ButtonClick" />
         <common:ThreeStateButton Grid.Row="2" x:Name="buttonPlayPause" HorizontalAlignment="Center" VerticalAlignment="Center" Height="78" Margin="0,0,0,0" UpImage="c:\apps\themes\picard\images\apps\mediaplayer\mediaplayer_playpause_up.png" DownImage="c:\apps\themes\picard\images\apps\mediaplayer\mediaplayer_playpause_down.png" ButtonClick="buttonPlayPause_ButtonClick" />
         <common:ThreeStateButton Grid.Row="2" x:Name="buttonForward" HorizontalAlignment="Center" VerticalAlignment="Center" Height="78" Margin="200,0,0,0" UpImage="c:\apps\themes\picard\images\apps\mediaplayer\mediaplayer_forward_up.png" DownImage="c:\apps\themes\picard\images\apps\mediaplayer\mediaplayer_forward_down.png" ButtonClick="buttonForward_ButtonClick" />
-        
-        <TextBlock Grid.Row="1" Name="textBlockTitle" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,10,0,0" FontFamily="Arial" FontSize="18" Text="" Foreground="White" />
-        
+
+        <Canvas Grid.Row="1" ClipToBounds="True" Name="canMain" Margin="0,10,0,0" >
+                <TextBlock Name="textBlockTitle" FontFamily="Arial" FontSize="19" Text="" Foreground="White" Margin="23,0,0,0" />
+        </Canvas>
         <Grid Grid.Row="1" HorizontalAlignment="Center" Margin="0,20,0,0" Width="250" Height="10">
             <Rectangle Grid.Row="1" Name="rectangleProgressBackground" Height="5" Fill="#808080" HorizontalAlignment="Left" Width="250" VerticalAlignment="Center" Margin="0" />
             <Rectangle Grid.Row="1" Name="rectangleProgressForeground" Height="5" Fill="White" HorizontalAlignment="Left" Width="0" VerticalAlignment="Center" Margin="0" />

@@ -10,9 +10,13 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Windows.Interop;
+
+using System.Runtime.InteropServices;
 
 using MediaPlayer.Settings;
 using MediaPlayer.Managers;
+using MediaPlayer.Data;
 
 namespace MediaPlayer.Windows
 {
@@ -25,11 +29,17 @@ namespace MediaPlayer.Windows
         private const double NominalVideoSpeed = 1.0;
         private MediaPlayState _mediaPlayState;
         private MediaFileType _mediaFileType;
+        private DeviceType _mediaType;
+        private PortableDevice.PortableDeviceObject _object;
         private string _fileName;
         private bool _isMuted;
         private bool _isFastForward;
         private int _timeShift;
         private int _stepCount;
+        private bool _isOpened;
+        private Uri _source = null;
+
+        private IntPtr _hwndParent;
 
         private System.Timers.Timer _endTimer;
 
@@ -39,18 +49,24 @@ namespace MediaPlayer.Windows
 
         private PortableDevice.MediaServer _mediaServer;
 
+        [DllImport("User32.dll")]
+        static extern IntPtr SetParent(IntPtr hWnd, IntPtr hParent);
+
         private WinMediaPlayer()
         {
             InitializeComponent();
 
             _mediaPlayState = MediaPlayState.Stop;
             _mediaFileType = MediaFileType.Audio;
+            _mediaType = DeviceType.PortableDevice;
+            _object = null;
             _fileName = string.Empty;
             _isMuted = false;
             _isFastForward = false;
             _timeShift = 1;
             _stepCount = 0;
             _volume = 1.0;
+            _isOpened = false;
 
             _mediaServer = new PortableDevice.MediaServer();
             _mediaServer.Start();
@@ -59,6 +75,8 @@ namespace MediaPlayer.Windows
 
             mediaElementMainVideo.MediaEnded += new RoutedEventHandler(mediaElementMainVideo_MediaEnded);
             mediaElementMainVideo.MediaFailed += new EventHandler<ExceptionRoutedEventArgs>(mediaElementMainVideo_MediaFailed);
+            mediaElementMainVideo.MediaOpened += new RoutedEventHandler(mediaElementMainVideo_MediaOpened);
+            mediaElementMainVideo.BufferingEnded += new RoutedEventHandler(mediaElementMainVideo_BufferingEnded);
 
 //            CalculateVolume(PicardLib.Settings.PersistentSettings.MediaPlayerVolumeDefault);
 
@@ -66,6 +84,25 @@ namespace MediaPlayer.Windows
             _endTimer.Interval = 300;
             _endTimer.AutoReset = true;
             _endTimer.Elapsed += new System.Timers.ElapsedEventHandler(_endTimer_Elapsed);
+
+            Loaded += new RoutedEventHandler(WinMediaPlayer_Loaded);
+        }
+
+        void mediaElementMainVideo_BufferingEnded(object sender, RoutedEventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine("mediaElementMainVideo_BufferingEnded");
+        }
+
+        void mediaElementMainVideo_MediaOpened(object sender, RoutedEventArgs e)
+        {
+            _isOpened = true;
+            System.Diagnostics.Debug.WriteLine("mediaElementMainVideo_MediaOpened");
+        }
+
+        void WinMediaPlayer_Loaded(object sender, RoutedEventArgs e)
+        {
+            var helper = new WindowInteropHelper(this);
+            SetParent(helper.Handle, _hwndParent);
         }
 
         public void Dispose()
@@ -90,7 +127,7 @@ namespace MediaPlayer.Windows
 
         void mediaElementMainVideo_MediaEnded(object sender, RoutedEventArgs e)
         {
-            _mediaPlayState = MediaPlayState.Stop;
+            Stop();
 
             if (OnMediaEnded != null)
                 OnMediaEnded(this, new EventArgs());
@@ -102,30 +139,81 @@ namespace MediaPlayer.Windows
 //            _volume = volumeStep * volume;
         }
 
+        public PortableDevice.PortableDeviceObject PortableObject
+        {
+            set
+            {
+                _object = value;
+                if (_object != null)
+                {
+                    PortableDevice.PortableDeviceFile item = _object as PortableDevice.PortableDeviceFile;
+                    System.Diagnostics.Debug.WriteLine(string.Format("path = {0}", item.Path));
+                    if (System.IO.File.Exists(item.Path))
+                    {
+                        _mediaType = DeviceType.UsbStorage;
+                        _source = new Uri(item.Path, UriKind.Absolute);
+                    }
+                    else
+                    {
+                        _source = new Uri(@"http://localhost:7896/", UriKind.Absolute);
+                        _mediaType = DeviceType.PortableDevice;
+                        _mediaServer.Device = GetDevice(item as PortableDevice.PortableDeviceObject);
+                        _mediaServer.FileObject = item;
+                    }
+                }
+            }
+        }
+
         public string FileName
         {
             set
             {
                 _fileName = value;
-                if (!string.IsNullOrEmpty(_fileName))
+/*                if (!string.IsNullOrEmpty(_fileName))
                 {
-                    PortableDevice.PortableDeviceObject item = null;
+                    PortableDevice.PortableDeviceFile item = null;
+                    List<PortableDevice.PortableDeviceObject> playList;
+                    Dictionary<string, PortableDevice.PortableDeviceObject> playDictionary;
 
-                    foreach (PortableDevice.PortableDeviceObject obj in MediaContentManager.Instance.MusicPlayList)
+                    if (_mediaFileType == Managers.MediaFileType.Audio)
+                    {
+                        playList = MediaContentManager.Instance.MusicPlayList;
+                        playDictionary = MediaContentManager.Instance.MusicPlayDictionary;
+                    }
+                    else
+                    {
+                        playList = MediaContentManager.Instance.VideoPlayList;
+                        playDictionary = MediaContentManager.Instance.VideoPlayDictionary;
+                    }
+
+                    foreach (PortableDevice.PortableDeviceObject obj in playList)
                     {
                         if (string.Compare(_fileName, obj.Name, true) == 0)
                         {
-                            item = obj;
+                            item = obj as PortableDevice.PortableDeviceFile;
                             break;
                         }
                     }
 //                    PortableDevice.PortableDeviceFile item = (PortableDevice.PortableDeviceFile)MediaContentManager.Instance.MusicPlayDictionary[_fileName];
                     if (item != null)
                     {
-                        _mediaServer.Device = MediaContentManager.Instance.Device;
-                        _mediaServer.FileObject = (PortableDevice.PortableDeviceFile)item;
+                        System.Diagnostics.Debug.WriteLine(string.Format("path = {0}", item.Path));
+                        if (System.IO.File.Exists(item.Path))
+                        {
+                            _mediaType = DeviceType.UsbStorage;
+                            _source = new Uri(item.Path, UriKind.Absolute);
+                        }
+                        else
+                        {
+                            _source = new Uri(@"http://localhost:7896/", UriKind.Absolute);
+                            _mediaType = DeviceType.PortableDevice;
+//                            _mediaServer.Device = MediaContentManager.Instance.Device;
+                            _mediaServer.Device = GetDevice(item as PortableDevice.PortableDeviceObject);
+                            _mediaServer.FileObject = item;
+                        }
                     }
                 }
+*/
             }
             get
             {
@@ -167,6 +255,7 @@ namespace MediaPlayer.Windows
 
                 try
                 {
+//                    System.Diagnostics.Debug.WriteLine(string.Format("TotalSeconds = {0}", mediaElementMainVideo.NaturalDuration.TimeSpan.TotalSeconds));
                     if (!mediaElementMainVideo.NaturalDuration.HasTimeSpan || (mediaElementMainVideo.NaturalDuration.TimeSpan.TotalSeconds == 0))
                         return result;
 
@@ -189,6 +278,14 @@ namespace MediaPlayer.Windows
             get { return _volume; }
         }
 
+        public bool IsOpened
+        {
+            get
+            {
+                return _isOpened;
+            }
+        }
+
         public void Play()
         {
             try
@@ -199,7 +296,9 @@ namespace MediaPlayer.Windows
                 hwndTarget.RenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
                 textBlockError.Text = "software decoding on";
 #endif
-                mediaElementMainVideo.Source = new Uri(@"http://localhost:7896/", UriKind.Absolute);
+                if (_mediaPlayState != Settings.MediaPlayState.Pause)
+                    mediaElementMainVideo.Source = _source;
+
                 mediaElementMainVideo.Play();
                 mediaElementMainVideo.IsMuted = _isMuted;
                 mediaElementMainVideo.Volume = _volume;
@@ -314,6 +413,7 @@ namespace MediaPlayer.Windows
                 _timeShift = 1;
                 _stepCount = 0;
                 _mediaServer.Stop();
+                _isOpened = false;
             }
             catch (Exception ex)
             {
@@ -340,6 +440,22 @@ namespace MediaPlayer.Windows
             }
         }
 
+        private PortableDevice.PortableDevice GetDevice(PortableDevice.PortableDeviceObject item)
+        {
+            PortableDevice.PortableDevice device = null;
+
+            foreach (PortableObject obj in MediaContentManager.Instance.PortableObjectList)
+            {
+                if (obj.ObjectList.Contains(item.Id))
+                {
+                    device = obj.Device;
+                    break;
+                }
+            }
+
+            return device;
+        }
+
         public MediaPlayState MediaPlayState
         {
             get { return _mediaPlayState; }
@@ -351,9 +467,36 @@ namespace MediaPlayer.Windows
             set { _mediaFileType = value; }
         }
 
+        public DeviceType MediaType
+        {
+            get { return _mediaType; }
+            set { _mediaType = value; }
+        }
+
         public bool IsMuted
         {
             get { return _isMuted; }
+        }
+
+        public IntPtr HWNDParent
+        {
+            set { _hwndParent = value; }
+        }
+
+        public double VideoWidth
+        {
+            set
+            {
+                Width = value;
+            }
+        }
+
+        public double VideoHeight
+        {
+            set
+            {
+                Height = value;
+            }
         }
     }
 }

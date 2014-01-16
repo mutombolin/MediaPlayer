@@ -12,6 +12,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 
+using System.Management;
+
 using MediaPlayer.Common;
 using MediaPlayer.Settings;
 using MediaPlayer.Windows;
@@ -25,6 +27,8 @@ namespace MediaPlayer
     public partial class MainWindow : Window
     {
         private bool _mediaEnded = false;
+        private ManagementEventWatcher _watcherRemove;
+        private ManagementEventWatcher _watcherInsert;
 
         public MainWindow()
         {
@@ -42,6 +46,14 @@ namespace MediaPlayer
 
             Loaded += new RoutedEventHandler(MainWindow_Loaded);
             Closed += new EventHandler(MainWindow_Closed);
+
+            SizeChanged += new SizeChangedEventHandler(MainWindow_SizeChanged);
+        }
+
+        void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            WinMediaPlayer.Instance.Width = mediaPlayerListCtrl.ActualWidth;
+            WinMediaPlayer.Instance.Height = mediaPlayerListCtrl.ActualHeight;
         }
 
         void Instance_MouseDown(object sender, MouseButtonEventArgs e)
@@ -68,7 +80,16 @@ namespace MediaPlayer
 
         void mediaPlayerPlayCtrl_ShowVideo(object sender, EventArgs e)
         {
-            throw new NotImplementedException();
+//            Point topLeft = mediaPlayerListCtrl.PointToScreen(new Point(0, 0));
+
+//            WinMediaPlayer.Instance.Left = topLeft.X;
+//            WinMediaPlayer.Instance.Top = topLeft.Y;
+//            WinMediaPlayer.Instance.Width = mediaPlayerListCtrl.ActualWidth;
+//            WinMediaPlayer.Instance.Height = mediaPlayerListCtrl.ActualHeight;
+            WinMediaPlayer.Instance.VideoWidth = mediaPlayerListCtrl.ActualWidth;
+            WinMediaPlayer.Instance.VideoHeight = mediaPlayerListCtrl.ActualHeight;
+
+            WinMediaPlayer.Instance.Show();
         }
 
         void mediaPlayerPlayCtrl_MovePrevious(object sender, EventArgs e)
@@ -81,10 +102,10 @@ namespace MediaPlayer
             mediaPlayerListCtrl.MoveNext();
         }
 
-        void mediaPlayerListCtrl_ItemSelectionHandler(string filename)
+        void mediaPlayerListCtrl_ItemSelectionHandler(PortableDevice.PortableDeviceObject obj, MediaFileType mediaFileType)
         {
-            System.Diagnostics.Debug.WriteLine(string.Format("filename = {0}", filename));
-            mediaPlayerPlayCtrl.SetMediaFile(filename);
+            System.Diagnostics.Debug.WriteLine(string.Format("filename = {0}", obj.Name));
+            mediaPlayerPlayCtrl.SetMediaFile(obj, mediaFileType);
         }
 
         void MainWindow_Closed(object sender, EventArgs e)
@@ -95,7 +116,9 @@ namespace MediaPlayer
 
         void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            MediaContentManager.Instance.Init();
+            AddInsertUSBHandler();
+            AddRemoveUSBHandler();
+            MediaContentManager.Instance.Init();            
         }
 
         public void MuteAudio(bool mute)
@@ -130,5 +153,75 @@ namespace MediaPlayer
         public void ResumeControl()
         { }
 
+        #region USB Insert/Remove detect
+        private void AddRemoveUSBHandler()
+        {
+            WqlEventQuery q;
+            ManagementScope scope = new ManagementScope("root\\CIMV2");
+            scope.Options.EnablePrivileges = true;
+
+            try
+            {
+                q = new WqlEventQuery();
+                q.EventClassName = "__InstanceDeletionEvent";
+                q.WithinInterval = new TimeSpan(0, 0, 5);
+                q.Condition = "TargetInstance ISA 'Win32_USBControllerdevice'";
+                _watcherRemove = new ManagementEventWatcher(scope, q);
+                _watcherRemove.EventArrived += new EventArrivedEventHandler(_watcher_EventArrived);
+                _watcherRemove.Start();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(string.Format("{0} {1} {2}",
+                    System.Reflection.Assembly.GetExecutingAssembly().GetName().Name,
+                    ex,
+                    "AddUSBHandler - Exception!!"));
+
+                if (_watcherRemove != null)
+                    _watcherRemove.Stop();
+            }
+        }
+
+        private void AddInsertUSBHandler()
+        {
+            WqlEventQuery q;
+            ManagementScope scope = new ManagementScope("root\\CIMV2");
+            scope.Options.EnablePrivileges = true;
+
+            try
+            {
+                q = new WqlEventQuery();
+                q.EventClassName = "__InstanceCreationEvent";
+                q.WithinInterval = new TimeSpan(0, 0, 5);
+                q.Condition = "TargetInstance ISA 'Win32_USBControllerdevice'";
+                _watcherInsert = new ManagementEventWatcher(scope, q);
+                _watcherInsert.EventArrived += new EventArrivedEventHandler(_watcherInsert_EventArrived);
+
+                _watcherInsert.Start();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(string.Format("{0} {1} {2}",
+                    System.Reflection.Assembly.GetExecutingAssembly().GetName().Name,
+                    ex,
+                    "AddInsertUSBHandler - Exception!!"));
+
+                if (_watcherInsert != null)
+                    _watcherInsert.Stop();
+            }
+        }
+
+        void _watcherInsert_EventArrived(object sender, EventArrivedEventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine("A USB device Inserted");
+            MediaContentManager.Instance.Init();
+        }
+
+        void _watcher_EventArrived(object sender, EventArrivedEventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine("A USB device removed");
+            MediaContentManager.Instance.Init();
+        }
+        #endregion
     }
 }

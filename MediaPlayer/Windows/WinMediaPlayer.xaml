@@ -8,7 +8,8 @@
         Height="100"
         Width="100"
         Top="0"
-        Left="0">
+        Left="0"
+        >
     
     <Grid Background="Black">
         

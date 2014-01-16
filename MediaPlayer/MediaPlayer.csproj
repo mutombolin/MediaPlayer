@@ -38,6 +38,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Management" />
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Core" />
@@ -56,8 +57,10 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Data\PortableDevices.cs" />
+    <Compile Include="HookWindows.cs" />
     <Compile Include="Managers\MediaContentManager.cs" />
     <Compile Include="Settings\Media.cs" />
+    <Compile Include="Settings\DeviceType.cs" />
     <Compile Include="Windows\WinMediaPlayer.xaml.cs">
       <DependentUpon>WinMediaPlayer.xaml</DependentUpon>
     </Compile>

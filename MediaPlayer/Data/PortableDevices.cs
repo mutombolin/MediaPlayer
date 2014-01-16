@@ -5,17 +5,21 @@ using System.Text;
 
 namespace MediaPlayer.Data
 {
-    public class PortableDevices
+    public class PortableObject
     {
         private PortableDevice.PortableDevice _device;
 
         private Dictionary<string, PortableDevice.PortableDeviceObject> _musicPlayDictionary;
         private Dictionary<string, PortableDevice.PortableDeviceObject> _videoPlayDictionary;
 
-        public PortableDevices()
+        private List<string> _objectList;
+
+        public PortableObject()
         {
             _musicPlayDictionary = new Dictionary<string, PortableDevice.PortableDeviceObject>();
             _videoPlayDictionary = new Dictionary<string, PortableDevice.PortableDeviceObject>();
+
+            _objectList = new List<string>();
         }
 
         public void Dispose()
@@ -57,6 +61,18 @@ namespace MediaPlayer.Data
             set
             {
                 _videoPlayDictionary = value;
+            }
+        }
+
+        public List<string> ObjectList
+        {
+            get
+            {
+                return _objectList;
+            }
+            set
+            {
+                _objectList = value;
             }
         }
     }
