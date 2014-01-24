@@ -93,7 +93,11 @@ namespace MediaPlayer
         private void SAFE_progressTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             double pixelsPerPercent = rectangleProgressBackground.ActualWidth / 100;
+#if VLC
+            rectangleProgressForeground.Width = pixelsPerPercent * VLCPlayer.Instance.PercentProgress;
+#else
             rectangleProgressForeground.Width = pixelsPerPercent * WinMediaPlayer.Instance.PercentProgress;
+#endif
         }
 
         private void _textScrollTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
@@ -125,18 +129,28 @@ namespace MediaPlayer
         private void SAFE_bufferingTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             _bufferingTimer.Stop();
-
+#if VLC
+            if (VLCPlayer.Instance.IsOpened)
+#else
             if (WinMediaPlayer.Instance.IsOpened)
+#endif
             {
+#if VLC
+                textBlockTitle.Text = System.IO.Path.GetFileNameWithoutExtension(VLCPlayer.Instance.FileName);
+#else
                 textBlockTitle.Text = System.IO.Path.GetFileNameWithoutExtension(WinMediaPlayer.Instance.FileName);
-
+#endif
                 _textScrollTimer.Interval = 1000;
                 _textScrollTimer.Start();
             }
             else
             {
                 if (_showBuffering)
+#if VLC
+                    textBlockTitle.Text = System.IO.Path.GetFileNameWithoutExtension(VLCPlayer.Instance.FileName);
+#else
                     textBlockTitle.Text = System.IO.Path.GetFileNameWithoutExtension(WinMediaPlayer.Instance.FileName);
+#endif
                 else
                     textBlockTitle.Text = string.Format("Buffering...");
 
@@ -156,11 +170,15 @@ namespace MediaPlayer
             _playTimer.Stop();
 
             System.Diagnostics.Debug.WriteLine(string.Format("================= SAFE_playTimer_Elapsed ================"));
-
+#if VLC
+            VLCPlayer.Instance.MediaFileType = _currentMediaFileType;
+            VLCPlayer.Instance.PortableObject = _currentObject;
+            VLCPlayer.Instance.FileName = _currentObject.Name;
+#else
             WinMediaPlayer.Instance.MediaFileType = _currentMediaFileType;
             WinMediaPlayer.Instance.PortableObject = _currentObject;
             WinMediaPlayer.Instance.FileName = _currentObject.Name;
-
+#endif
             if (_currentObject != null)
                 SetPlayState(MediaPlayState.Play);
         }
@@ -178,10 +196,17 @@ namespace MediaPlayer
 
         private void buttonPlayPause_ButtonClick(object sender, EventArgs e)
         {
+#if VLC
+            if (string.IsNullOrEmpty(VLCPlayer.Instance.FileName))
+#else
             if (string.IsNullOrEmpty(WinMediaPlayer.Instance.FileName))
+#endif
                 return;
-
+#if VLC
+            switch (VLCPlayer.Instance.MediaPlayState)
+#else
             switch (WinMediaPlayer.Instance.MediaPlayState)
+#endif
             { 
                 case MediaPlayState.Stop:
                     SetPlayState(MediaPlayState.Play);
@@ -240,13 +265,22 @@ namespace MediaPlayer
                     case MediaPlayState.Stop:
                         _progressTimer.Stop();
                         _textScrollTimer.Stop();
+#if VLC
+                        VLCPlayer.Instance.Stop();
+                        VLCPlayer.Instance.Hide();
+#else
                         WinMediaPlayer.Instance.Stop();
                         WinMediaPlayer.Instance.Hide();
+#endif
                         rectangleProgressForeground.Width = 0;
                         rectangleProgressForeground.Visibility = System.Windows.Visibility.Hidden;
                         rectangleProgressBackground.Visibility = System.Windows.Visibility.Hidden;
                         textBlockTitle.Text = string.Empty;
+#if VLC
+                        VLCPlayer.Instance.FileName = string.Empty;
+#else
                         WinMediaPlayer.Instance.FileName = string.Empty;
+#endif
                         NotifyStateChange();
                         break;
                     case MediaPlayState.Pause:
@@ -254,18 +288,32 @@ namespace MediaPlayer
                         textBlockTitle.BeginAnimation(Canvas.LeftProperty, null);
                         rectangleProgressForeground.Visibility = System.Windows.Visibility.Visible;
                         rectangleProgressBackground.Visibility = System.Windows.Visibility.Visible;
+#if VLC
+                        VLCPlayer.Instance.Pause();
+                        VLCPlayer.Instance.Hide();
+#else
                         WinMediaPlayer.Instance.Pause();
                         WinMediaPlayer.Instance.Hide();
+#endif
                         NotifyStateChange();
                         break;
                     case MediaPlayState.Play:
                         rectangleProgressForeground.Visibility = System.Windows.Visibility.Visible;
                         rectangleProgressBackground.Visibility = System.Windows.Visibility.Visible;
+#if VLC
+                        VLCPlayer.Instance.Play();
+                        if ((ShowVideo != null) && (VLCPlayer.Instance.MediaFileType == MediaFileType.Video))
+                            ShowVideo(this, new EventArgs());
+
+                        textBlockTitle.Text = System.IO.Path.GetFileNameWithoutExtension(VLCPlayer.Instance.FileName);
+#else
                         WinMediaPlayer.Instance.Play();
                         // Show Video
                         if ((ShowVideo != null) && (WinMediaPlayer.Instance.MediaFileType == MediaFileType.Video))
                             ShowVideo(this, new EventArgs());
+
                         textBlockTitle.Text = System.IO.Path.GetFileNameWithoutExtension(WinMediaPlayer.Instance.FileName);
+#endif
                         _progressTimer.Start();
                         textBlockTitle.BeginAnimation(Canvas.LeftProperty, null);
                         _bufferingTimer.Start();

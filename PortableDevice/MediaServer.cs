@@ -32,6 +32,8 @@ namespace PortableDevice
 
         private ManualResetEvent resetEvent;
 
+        public event EventHandler OnLoadingFinished;
+
         private PortableDevice _device;
         private PortableDeviceFile _file;
 
@@ -233,6 +235,7 @@ namespace PortableDevice
                     }
                 }
                 System.Diagnostics.Debug.WriteLine(string.Format("Count = {0}", Count));
+                OnLoadingFinished(this, new EventArgs());
 
                 response.StatusCode = (int)HttpStatusCode.OK;
                 response.StatusDescription = "OK";

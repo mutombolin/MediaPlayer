@@ -6,7 +6,7 @@ using System.Text;
 using System.Diagnostics;
 using System.IO.Pipes;
 
-namespace WebBrowserApp
+namespace MediaPlayer
 {
     // Delegate for passing received message back to caller
     public delegate void DelegateMessage(string Reply);

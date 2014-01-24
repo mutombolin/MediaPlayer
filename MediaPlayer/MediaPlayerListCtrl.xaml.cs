@@ -52,7 +52,11 @@ namespace MediaPlayer
         void MediaPlayerListCtrl_Loaded(object sender, RoutedEventArgs e)
         {
             HwndSource hwnd = (HwndSource)HwndSource.FromVisual(this);
+#if VLC
+            VLCPlayer.Instance.HWNDParent = hwnd.Handle;
+#else
             WinMediaPlayer.Instance.HWNDParent = hwnd.Handle;
+#endif
         }
 
         void Instance_ScanningMedia(object sender, EventArgs e)

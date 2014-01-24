@@ -46,6 +46,7 @@ namespace MediaPlayer.Windows
         public static readonly WinMediaPlayer Instance = new WinMediaPlayer();
 
         public event EventHandler OnMediaEnded;
+        public event EventHandler OnFullScreen;
 
         private PortableDevice.MediaServer _mediaServer;
 
@@ -77,6 +78,9 @@ namespace MediaPlayer.Windows
             mediaElementMainVideo.MediaFailed += new EventHandler<ExceptionRoutedEventArgs>(mediaElementMainVideo_MediaFailed);
             mediaElementMainVideo.MediaOpened += new RoutedEventHandler(mediaElementMainVideo_MediaOpened);
             mediaElementMainVideo.BufferingEnded += new RoutedEventHandler(mediaElementMainVideo_BufferingEnded);
+            mediaElementMainVideo.MouseDown += new MouseButtonEventHandler(mediaElementMainVideo_MouseDown);
+
+            _mediaServer.OnLoadingFinished += new EventHandler(_mediaServer_OnLoadingFinished);
 
 //            CalculateVolume(PicardLib.Settings.PersistentSettings.MediaPlayerVolumeDefault);
 
@@ -97,6 +101,14 @@ namespace MediaPlayer.Windows
         {
             _isOpened = true;
             System.Diagnostics.Debug.WriteLine("mediaElementMainVideo_MediaOpened");
+        }
+
+        void mediaElementMainVideo_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine("mediaElementMainVideo_MouseDown");
+
+            if (OnFullScreen != null)
+                OnFullScreen(this, new EventArgs());
         }
 
         void WinMediaPlayer_Loaded(object sender, RoutedEventArgs e)
@@ -169,84 +181,13 @@ namespace MediaPlayer.Windows
             set
             {
                 _fileName = value;
-/*                if (!string.IsNullOrEmpty(_fileName))
-                {
-                    PortableDevice.PortableDeviceFile item = null;
-                    List<PortableDevice.PortableDeviceObject> playList;
-                    Dictionary<string, PortableDevice.PortableDeviceObject> playDictionary;
-
-                    if (_mediaFileType == Managers.MediaFileType.Audio)
-                    {
-                        playList = MediaContentManager.Instance.MusicPlayList;
-                        playDictionary = MediaContentManager.Instance.MusicPlayDictionary;
-                    }
-                    else
-                    {
-                        playList = MediaContentManager.Instance.VideoPlayList;
-                        playDictionary = MediaContentManager.Instance.VideoPlayDictionary;
-                    }
-
-                    foreach (PortableDevice.PortableDeviceObject obj in playList)
-                    {
-                        if (string.Compare(_fileName, obj.Name, true) == 0)
-                        {
-                            item = obj as PortableDevice.PortableDeviceFile;
-                            break;
-                        }
-                    }
-//                    PortableDevice.PortableDeviceFile item = (PortableDevice.PortableDeviceFile)MediaContentManager.Instance.MusicPlayDictionary[_fileName];
-                    if (item != null)
-                    {
-                        System.Diagnostics.Debug.WriteLine(string.Format("path = {0}", item.Path));
-                        if (System.IO.File.Exists(item.Path))
-                        {
-                            _mediaType = DeviceType.UsbStorage;
-                            _source = new Uri(item.Path, UriKind.Absolute);
-                        }
-                        else
-                        {
-                            _source = new Uri(@"http://localhost:7896/", UriKind.Absolute);
-                            _mediaType = DeviceType.PortableDevice;
-//                            _mediaServer.Device = MediaContentManager.Instance.Device;
-                            _mediaServer.Device = GetDevice(item as PortableDevice.PortableDeviceObject);
-                            _mediaServer.FileObject = item;
-                        }
-                    }
-                }
-*/
             }
             get
             {
                 return _fileName;
             }
         }
-/*
-        public string FileName
-        {
-            set
-            {
-                try
-                {
-                    _fileName = value;
-                    if (_fileName != string.Empty)
-                        mediaElementMainVideo.Source = new Uri(value, UriKind.RelativeOrAbsolute);
-                    else
-                        mediaElementMainVideo.Source = null;
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine(string.Format("{0} {1} {2}",
-                        System.Reflection.Assembly.GetExecutingAssembly().GetName().Name,
-                        ex,
-                        "winmediaplayer.videofilename: exception"));
-                }
-            }
-            get
-            {
-                return _fileName;
-            }
-        }
-*/
+
         public int PercentProgress
         {
             get
@@ -455,6 +396,25 @@ namespace MediaPlayer.Windows
 
             return device;
         }
+
+        #region mediaserver event handle
+        void _mediaServer_OnLoadingFinished(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new EventHandler(SAFE_mediaServer_OnLoadingFinished), sender, e);
+        }
+
+        private void SAFE_mediaServer_OnLoadingFinished(object sender, EventArgs e)
+        {
+            // get total time, ugly but available.
+            if (this._mediaPlayState == Settings.MediaPlayState.Play)
+            {
+                
+
+                mediaElementMainVideo.Pause();
+                mediaElementMainVideo.Play();
+            }        
+        }
+        #endregion
 
         public MediaPlayState MediaPlayState
         {
