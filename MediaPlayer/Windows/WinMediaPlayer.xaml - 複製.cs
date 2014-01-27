@@ -60,8 +60,15 @@ namespace MediaPlayer.Windows
         private System.Windows.Forms.Label _textBlockError = null;
         private System.Windows.Forms.Label _textBlockMessage = null;
 
-        [DllImport("User32.dll", EntryPoint = "SetParent")]
-        public static extern IntPtr SetParent(IntPtr hWnd, IntPtr hParent);
+        const int SWP_NOZORDER = 0X0004;
+        const int SWP_NOACTIVATE = 0x0010;
+
+
+        [DllImport("user32.dll", EntryPoint = "SetWindowPos")]
+        public static extern IntPtr SetWindowPos(IntPtr hWnd, int hWndInsertAfter, int x, int Y, int cx, int cy, int wFlags);
+
+        [DllImport("User32.dll")]
+        static extern IntPtr SetParent(IntPtr hWnd, IntPtr hParent);
 
         private WinMediaPlayer()
         {
@@ -132,17 +139,36 @@ namespace MediaPlayer.Windows
 
         void mediaElementMainVideo_PlayStateChange(object sender, AxWMPLib._WMPOCXEvents_PlayStateChangeEvent e)
         {
-            System.Diagnostics.Debug.WriteLine(string.Format("PlayState = {0}", (int)e.newState));
-            if (e.newState == (int)WMPLib.WMPPlayState.wmppsPlaying)
-            {
-                this._isOpened = true;
-            }
-            else if (e.newState == (int)WMPLib.WMPPlayState.wmppsMediaEnded)
-            {
-                Stop();
-
-                if (OnMediaEnded != null)
-                    OnMediaEnded(this, new EventArgs());
+            switch (e.newState)
+            { 
+                case 0:
+                    break;
+                case 1:
+                    break;
+                case 2:
+                    break;
+                case 3:
+                    break;
+                case 4:
+                    break;
+                case 5:
+                    break;
+                case 6:
+                    break;
+                case 7:
+                    break;
+                case 8:
+                    break;
+                case 9:
+                    break;
+                case 10:
+                    break;
+                case 11:
+                    break;
+                case 12:
+                    break;
+                default:
+                    break;
             }
         }
 
@@ -173,14 +199,10 @@ namespace MediaPlayer.Windows
 
         public void Dispose()
         {
-            try
-            {
-                mediaElementMainVideo.Ctlcontrols.stop();
-                mediaElementMainVideo.close();
-                _mediaServer.Stop();
-                _mediaServer.Dispose();
-            }
-            catch { }
+            mediaElementMainVideo.Ctlcontrols.stop();
+//            mediaElementMainVideo.Stop();
+            _mediaServer.Stop();
+            _mediaServer.Dispose();
         }
 
         void mediaElementMainVideo_MediaFailed(object sender, ExceptionRoutedEventArgs e)
@@ -192,7 +214,8 @@ namespace MediaPlayer.Windows
                     e.ErrorException,
                     "winmediaplayer.mediaElementMainVideo_MediaFailed: exception"));
             }
-            _mediaPlayState = MediaPlayState.Stop;
+
+            //_mediaPlayState = MediaPlayState.Stop;
         }
 
         void mediaElementMainVideo_MediaEnded(object sender, RoutedEventArgs e)
@@ -217,14 +240,17 @@ namespace MediaPlayer.Windows
                 if (_object != null)
                 {
                     PortableDevice.PortableDeviceFile item = _object as PortableDevice.PortableDeviceFile;
+                    System.Diagnostics.Debug.WriteLine(string.Format("path = {0}", item.Path));
                     if (System.IO.File.Exists(item.Path))
                     {
                         _mediaType = DeviceType.UsbStorage;
                         _source = item.Path;
+//                        _source = new Uri(item.Path, UriKind.Absolute);
                     }
                     else
                     {
                         _source = @"http://localhost:7896/";
+//                        _source = new Uri(@"http://localhost:7896/", UriKind.Absolute);
                         _mediaType = DeviceType.PortableDevice;
                         _mediaServer.Device = GetDevice(item as PortableDevice.PortableDeviceObject);
                         _mediaServer.FileObject = item;
@@ -253,14 +279,22 @@ namespace MediaPlayer.Windows
 
                 try
                 {
+//                    System.Diagnostics.Debug.WriteLine(string.Format("TotalSeconds = {0}", mediaElementMainVideo.NaturalDuration.TimeSpan.TotalSeconds));
+                    System.Diagnostics.Debug.WriteLine(string.Format("current position = {0} total time = {1}", mediaElementMainVideo.Ctlcontrols.currentPosition, mediaElementMainVideo.currentMedia.duration.ToString()));
+
                     double duration = mediaElementMainVideo.currentMedia.duration;
 
-                    if (!(Math.Abs(duration - 0.0) < 0.001)) // Make sure the duration is bigger than 0.0
+                    if (!(Math.Abs(duration - 0.0) < 0.001))
                     { 
                         double currentPosition = mediaElementMainVideo.Ctlcontrols.currentPosition;
 
                         result = (int)(currentPosition / duration * 100.0);
                     }
+/*                    if (!mediaElementMainVideo.NaturalDuration.HasTimeSpan || (mediaElementMainVideo.NaturalDuration.TimeSpan.TotalSeconds == 0))
+                        return result;
+
+                    result = (int)(mediaElementMainVideo.Position.TotalSeconds / mediaElementMainVideo.NaturalDuration.TimeSpan.TotalSeconds * 100.0);
+*/
                 }
                 catch (Exception ex)
                 {
@@ -302,18 +336,24 @@ namespace MediaPlayer.Windows
                     mediaElementMainVideo.Ctlcontrols.stop();
                     mediaElementMainVideo.close();
                     mediaElementMainVideo.URL = _source;
+//                    mediaElementMainVideo.Source = _source;
                 }
 
+//                mediaElementMainVideo.Ctlcontrols.currentPosition = 0.0;
                 mediaElementMainVideo.settings.rate = NominalVideoSpeed;
                 mediaElementMainVideo.settings.mute = _isMuted;
                 mediaElementMainVideo.Ctlcontrols.play();
-                mediaElementMainVideo.settings.volume = (int)(20 * _volume);
+//                mediaElementMainVideo.Play();
+//                mediaElementMainVideo.IsMuted = _isMuted;
+//                mediaElementMainVideo.Volume = _volume;
                 _mediaPlayState = MediaPlayState.Play;
+//                mediaElementMainVideo.SpeedRatio = NominalVideoSpeed;
                 _isFastForward = true;
                 _timeShift = 1;
                 _stepCount = 0;
                 _textBlockError.Visible = false;
                 _textBlockMessage.Visible = false;
+//                SetWindowSize(new Rect());
             }
             catch (Exception ex)
             {
@@ -349,6 +389,7 @@ namespace MediaPlayer.Windows
             else
                 shift = _timeShift * -1;
 
+//            mediaElementMainVideo.Position = mediaElementMainVideo.Position.Add(new TimeSpan(0, 0, shift));
             _stepCount++;
         }
 
@@ -397,6 +438,7 @@ namespace MediaPlayer.Windows
             try
             {
                 mediaElementMainVideo.Ctlcontrols.pause();
+//                mediaElementMainVideo.Pause();
                 _mediaPlayState = MediaPlayState.Pause;
             }
             catch (Exception ex)
@@ -414,6 +456,8 @@ namespace MediaPlayer.Windows
             {
                 mediaElementMainVideo.Ctlcontrols.stop();
                 mediaElementMainVideo.URL = null;
+//                mediaElementMainVideo.Stop();
+//                mediaElementMainVideo.Source = null;
                 _mediaPlayState = MediaPlayState.Stop;
                 _isFastForward = true;
                 _timeShift = 1;
@@ -436,10 +480,8 @@ namespace MediaPlayer.Windows
             try
             {
                 mediaElementMainVideo.settings.mute = mute;
+//                mediaElementMainVideo.IsMuted = mute;
                 _isMuted = mute;
-
-                if (!mute)
-                    mediaElementMainVideo.settings.volume = (int)(20 * _volume);
             }
             catch (Exception ex)
             {
@@ -452,13 +494,8 @@ namespace MediaPlayer.Windows
 
         public void SetWindowSize(Rect rect)
         {
-            Hide();
-            var helper = new WindowInteropHelper(this);
-            SetParent(helper.Handle, IntPtr.Zero);
-            this.Width = rect.Width;
-            this.Height = rect.Height;
-            SetParent(helper.Handle, _hwndParent);
-            Show();
+            WindowInteropHelper helper = new WindowInteropHelper(this);
+            SetWindowPos(helper.Handle, 0, 0, 0, (int)this.Width, (int)this.Height, SWP_NOACTIVATE | SWP_NOZORDER);
         }
 
         private PortableDevice.PortableDevice GetDevice(PortableDevice.PortableDeviceObject item)
@@ -485,7 +522,14 @@ namespace MediaPlayer.Windows
 
         private void SAFE_mediaServer_OnLoadingFinished(object sender, EventArgs e)
         {
-      
+            // get total time, ugly but available.
+            if (this._mediaPlayState == Settings.MediaPlayState.Play)
+            {
+                
+
+//                mediaElementMainVideo.Pause();
+//                mediaElementMainVideo.Play();
+            }        
         }
         #endregion
 

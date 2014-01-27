@@ -5,13 +5,15 @@
         Title="MediaPlayer"
         Height="565"
         Width="946"
-        WindowStyle="None"
-        ResizeMode="NoResize">
-    <Grid>
+        Style="{DynamicResource ResourceKey=DefaultStyle}"
+        >
+
+    <Grid Background="Black">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="640*" />
             <ColumnDefinition Width="300*" />
         </Grid.ColumnDefinitions>
+                
         <common:MediaPlayerListCtrl x:Name="mediaPlayerListCtrl" Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
         <common:MediaPlayerPlayCtrl x:Name="mediaPlayerPlayCtrl" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
     </Grid>

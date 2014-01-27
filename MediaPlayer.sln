@@ -5,6 +5,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MediaPlayer", "MediaPlayer\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PortableDevice", "PortableDevice\PortableDevice.csproj", "{C1106A6B-E931-4592-8D3F-803830527436}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WmpFormsLib", "..\..\Picard project\Picard\Electrical\Software\Source\WmpFormsLib\WmpFormsLib.csproj", "{A439047D-167E-4ED7-B93C-19424DBC1EB2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,6 +37,16 @@ Global
 		{C1106A6B-E931-4592-8D3F-803830527436}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{C1106A6B-E931-4592-8D3F-803830527436}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{C1106A6B-E931-4592-8D3F-803830527436}.Release|x86.ActiveCfg = Release|Any CPU
+		{A439047D-167E-4ED7-B93C-19424DBC1EB2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A439047D-167E-4ED7-B93C-19424DBC1EB2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A439047D-167E-4ED7-B93C-19424DBC1EB2}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{A439047D-167E-4ED7-B93C-19424DBC1EB2}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{A439047D-167E-4ED7-B93C-19424DBC1EB2}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A439047D-167E-4ED7-B93C-19424DBC1EB2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A439047D-167E-4ED7-B93C-19424DBC1EB2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A439047D-167E-4ED7-B93C-19424DBC1EB2}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{A439047D-167E-4ED7-B93C-19424DBC1EB2}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{A439047D-167E-4ED7-B93C-19424DBC1EB2}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

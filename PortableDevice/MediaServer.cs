@@ -160,7 +160,7 @@ namespace PortableDevice
                 return;
 
             while (_sourceStream != null)
-                Thread.Sleep(100);
+                Thread.Sleep(50);
 
             try
             {

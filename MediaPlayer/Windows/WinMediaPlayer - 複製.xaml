@@ -13,7 +13,12 @@
         >
     
     <Grid Background="Black">
+        
+<!--        <MediaElement Name="mediaElementMainVideo" LoadedBehavior="Manual" UnloadedBehavior="Manual" />
+-->
         <WindowsFormsHost Name="formsHost">
-        </WindowsFormsHost>      
+        </WindowsFormsHost>
+<!--        <TextBlock Name="textBlockError" FontFamily="Arial" FontSize="16" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10,0,0,10" Foreground="Red" />
+-->        
     </Grid>
 </Window>

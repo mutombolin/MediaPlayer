@@ -235,10 +235,16 @@ namespace MediaPlayer
             if (_totalItems <= 0)
                 return;
 
-            if (_selectedIndex != -1)
+/*            if (_selectedIndex == -1)
             {
                 MediaPlayerListItemCtrl selectedListItem = (MediaPlayerListItemCtrl)stackPanelItems.Children[_selectedIndex];
                 selectedListItem.IsSelected = false;
+            }
+*/
+            foreach (MediaPlayerListItemCtrl selectedListItem in stackPanelItems.Children)
+            {
+                if (selectedListItem.IsSelected)
+                    selectedListItem.IsSelected = false;
             }
 
             if (_selectedIndex == -1)

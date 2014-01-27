@@ -51,8 +51,7 @@ namespace MediaPlayer
 
             if (!_isStandalone)
             {
-//                this.SetResourceReference(DataContextProperty, "CustomStyle");
-
+                this.Style = (Style)FindResource("CustomStyle");
                 this.WindowStartupLocation = System.Windows.WindowStartupLocation.Manual;
                 this.Left = _left;
                 this.Top = _top;
@@ -61,12 +60,6 @@ namespace MediaPlayer
                 _pipeServer.PipeMessage += new DelegateMessage(_pipeServer_PipeMessage);
                 _pipeServer.VisibleEvent += new EventHandler(_pipeServer_VisibleEvent);
                 _pipeServer.Listen(PIPE_NAME);
-            }
-            else
-            {
-                this.WindowStyle = System.Windows.WindowStyle.SingleBorderWindow;
-                this.ResizeMode = System.Windows.ResizeMode.CanResize;
-//                this.SetResourceReference(DataContextProperty, "DefaultStyle");
             }
 
             mediaPlayerListCtrl.ItemSelectionHandler += new MediaPlayerListCtrl.ItemSelection(mediaPlayerListCtrl_ItemSelectionHandler);
@@ -85,7 +78,7 @@ namespace MediaPlayer
             Loaded += new RoutedEventHandler(MainWindow_Loaded);
             Closed += new EventHandler(MainWindow_Closed);
 
-            SizeChanged += new SizeChangedEventHandler(MainWindow_SizeChanged);
+//            SizeChanged += new SizeChangedEventHandler(MainWindow_SizeChanged);
         }
 
         void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -117,8 +110,8 @@ namespace MediaPlayer
 
             if (!_isFullScreen)
             {
-                width = this.Width;
-                height = this.Height;
+                width = this.ActualWidth;
+                height = this.ActualHeight;
                 _isFullScreen = true;
             }
             else
@@ -128,8 +121,7 @@ namespace MediaPlayer
                 _isFullScreen = false;
             }
 
-            WinMediaPlayer.Instance.Width = width;
-            WinMediaPlayer.Instance.Height = height;
+            WinMediaPlayer.Instance.SetWindowSize(new Rect(0, 0, width, height));
         }
 
         void mediaPlayerPlayCtrl_StateChange(object sender, EventArgs e)
@@ -154,8 +146,11 @@ namespace MediaPlayer
             VLCPlayer.Instance.VideoHeight = mediaPlayerListCtrl.ActualHeight;
             VLCPlayer.Instance.Show();
 #else
-            WinMediaPlayer.Instance.VideoWidth = mediaPlayerListCtrl.ActualWidth;
-            WinMediaPlayer.Instance.VideoHeight = mediaPlayerListCtrl.ActualHeight;
+//            WinMediaPlayer.Instance.Width = mediaPlayerListCtrl.ActualWidth;
+//            WinMediaPlayer.Instance.Height = mediaPlayerListCtrl.ActualHeight;
+            WinMediaPlayer.Instance.SetWindowSize(new Rect(0, 0, mediaPlayerListCtrl.ActualWidth, mediaPlayerListCtrl.ActualHeight));
+//            WinMediaPlayer.Instance.VideoWidth = mediaPlayerListCtrl.ActualWidth;
+//            WinMediaPlayer.Instance.VideoHeight = mediaPlayerListCtrl.ActualHeight;
             WinMediaPlayer.Instance.Show();
 #endif
         }
@@ -214,7 +209,7 @@ namespace MediaPlayer
 #if VLC
             VLCPlayer.Instance.Mute(mute);
 #else
-            WinMediaPlayer.Instance.Mute(mute);
+            WinMediaPlayer.Instance.Mute(mute);                
 #endif
         }
 
@@ -345,6 +340,14 @@ namespace MediaPlayer
                 {
                     Dispatcher.BeginInvoke(new Action(StopWindow));
                 }
+                else if (message.ToLower().Contains("mute"))
+                {
+                    Dispatcher.BeginInvoke(new Action(MuteWindow));
+                }
+                else if (message.ToLower().Contains("unmute"))
+                {
+                    Dispatcher.BeginInvoke(new Action(UnMuteWindow));
+                }
             }
             catch (Exception ex)
             {
@@ -396,6 +399,21 @@ namespace MediaPlayer
         {
             Close();
             App.Current.Shutdown();
+        }
+
+        private void MuteWindow()
+        {
+            this.MuteAudio(true);
+        }
+
+        private void UnMuteWindow()
+        {
+            this.MuteAudio(false);
+        }
+
+        private void ShowBackground(bool show)
+        {
+            mediaPlayerListCtrl.Visibility = show ? System.Windows.Visibility.Hidden : System.Windows.Visibility.Visible;
         }
         #endregion
 
