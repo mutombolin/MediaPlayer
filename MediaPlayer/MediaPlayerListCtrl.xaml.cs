@@ -16,6 +16,7 @@ using System.Windows.Interop;
 using MediaPlayer.Common;
 using MediaPlayer.Managers;
 using MediaPlayer.Windows;
+using JHTNA.modules.strings;
 
 namespace MediaPlayer
 {
@@ -49,6 +50,22 @@ namespace MediaPlayer
             MediaContentManager.Instance.UpdateMedia += new EventHandler(Instance_UpdateMedia);
         }
 
+        #region LanguageChanged
+        public void LanguageChanged()
+        {
+            LoadStrings();
+        }
+
+        private void LoadStrings()
+        {
+            textBlockTitle.Text = StringManager.GetAppString(StringsConstApplication.MediaPlayer);
+            textBlockMessage.Text = StringManager.GetAppString(StringsConstApplication.SearchingForMedia);
+            textBlockAudio.Text = StringManager.GetAppString(StringsConstApplication.Audio);
+            textBlockVideo.Text = StringManager.GetAppString(StringsConstApplication.Video);
+            UpdateLayout();
+        }
+        #endregion
+
         void MediaPlayerListCtrl_Loaded(object sender, RoutedEventArgs e)
         {
             HwndSource hwnd = (HwndSource)HwndSource.FromVisual(this);
@@ -66,7 +83,7 @@ namespace MediaPlayer
 
         private void SAFE_Instance_ScanningMedia(object sender, EventArgs e)
         {
-            ShowMessage("Media found, scanning drive...");
+            ShowMessage(StringManager.GetAppString(StringsConstApplication.MediaFoundScanningDrive));
         }
 
         void Instance_NoMediaFound(object sender, EventArgs e)
@@ -76,7 +93,7 @@ namespace MediaPlayer
 
         private void SAFE_Instance_NoMediaFound(object sender, EventArgs e)
         {
-            ShowMessage("Searching for media...");
+            ShowMessage(StringManager.GetAppString(StringsConstApplication.SearchingForMedia));
         }
 
         void Instance_MediaFound(object sender, EventArgs e)
@@ -86,8 +103,7 @@ namespace MediaPlayer
 
         void SAFE_Instance_MediaFound(object sender, EventArgs e)
         {
-//            MediaContentManager.Instance.Stop();
-            System.Diagnostics.Debug.WriteLine("SAFE_Instance_MediaFound");
+//            System.Diagnostics.Debug.WriteLine("SAFE_Instance_MediaFound");
 
             if (MediaContentManager.Instance.MusicPlayList.Count > 0)
                 _inAudio = true;
@@ -108,7 +124,7 @@ namespace MediaPlayer
         private void SAFE_Instance_UpdateMedia(object sender, EventArgs e)
         {
             ContentClear();
-            ShowMessage("Searching for media...");
+            ShowMessage(StringManager.GetAppString(StringsConstApplication.SearchingForMedia));
         }
 
         private void ContentClear()
@@ -123,11 +139,11 @@ namespace MediaPlayer
             SwapImage(imageAudio, SELECTED_IMAGE);
 
             if (MediaContentManager.Instance.IsSearching)
-                ShowMessage("Please wait, searching for audio...");
+                ShowMessage(StringManager.GetAppString(StringsConstApplication.PleaseWaitSearchingForAudio));
             else if (MediaContentManager.Instance.IsMusicFilesFound)
                 ShowContent(MediaContentManager.Instance.MusicPlayList);
             else
-                ShowMessage("Searching for media...");
+                ShowMessage(StringManager.GetAppString(StringsConstApplication.SearchingForMedia));
         }
 
         private void ShowVideo()
@@ -137,11 +153,11 @@ namespace MediaPlayer
             SwapImage(imageVideo, SELECTED_IMAGE);
 
             if (MediaContentManager.Instance.IsSearching)
-                ShowMessage("Please wait, searching for video...");
+                ShowMessage(StringManager.GetAppString(StringsConstApplication.PleaseWaitSearchingForVideo));
             else if (MediaContentManager.Instance.IsVideoFilesFound)
                 ShowContent(MediaContentManager.Instance.VideoPlayList);
             else
-                ShowMessage("Searching for media...");
+                ShowMessage(StringManager.GetAppString(StringsConstApplication.SearchingForMedia));
         }
 
         private void ShowMessage(string message)
@@ -160,7 +176,7 @@ namespace MediaPlayer
 
             if (_totalItems <= 0)
             {
-                ShowMessage("No files found");
+                ShowMessage(StringManager.GetAppString(StringsConstApplication.NoFilesFound));
                 return;
             }
             textBlockFileCount.Visibility = System.Windows.Visibility.Visible;

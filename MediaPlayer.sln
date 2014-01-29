@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PortableDevice", "PortableD
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WmpFormsLib", "..\..\Picard project\Picard\Electrical\Software\Source\WmpFormsLib\WmpFormsLib.csproj", "{A439047D-167E-4ED7-B93C-19424DBC1EB2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "jhtna.modules.strings", "..\..\Picard project\Picard\Electrical\Software\Source\jhtna.modules.strings\jhtna.modules.strings.csproj", "{86184F26-0F8C-44FE-A3D4-0EC1F52E8943}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -47,6 +49,16 @@ Global
 		{A439047D-167E-4ED7-B93C-19424DBC1EB2}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{A439047D-167E-4ED7-B93C-19424DBC1EB2}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{A439047D-167E-4ED7-B93C-19424DBC1EB2}.Release|x86.ActiveCfg = Release|Any CPU
+		{86184F26-0F8C-44FE-A3D4-0EC1F52E8943}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86184F26-0F8C-44FE-A3D4-0EC1F52E8943}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86184F26-0F8C-44FE-A3D4-0EC1F52E8943}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{86184F26-0F8C-44FE-A3D4-0EC1F52E8943}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{86184F26-0F8C-44FE-A3D4-0EC1F52E8943}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{86184F26-0F8C-44FE-A3D4-0EC1F52E8943}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86184F26-0F8C-44FE-A3D4-0EC1F52E8943}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86184F26-0F8C-44FE-A3D4-0EC1F52E8943}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{86184F26-0F8C-44FE-A3D4-0EC1F52E8943}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{86184F26-0F8C-44FE-A3D4-0EC1F52E8943}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

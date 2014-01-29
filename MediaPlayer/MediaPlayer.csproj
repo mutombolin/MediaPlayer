@@ -20,7 +20,7 @@
     <PlatformTarget>x86</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
-    <Optimize>true</Optimize>
+    <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>TRACE;DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
@@ -159,6 +159,10 @@
     <AppDesigner Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\..\Picard project\Picard\Electrical\Software\Source\jhtna.modules.strings\jhtna.modules.strings.csproj">
+      <Project>{86184F26-0F8C-44FE-A3D4-0EC1F52E8943}</Project>
+      <Name>jhtna.modules.strings</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\..\Picard project\Picard\Electrical\Software\Source\WmpFormsLib\WmpFormsLib.csproj">
       <Project>{A439047D-167E-4ED7-B93C-19424DBC1EB2}</Project>
       <Name>WmpFormsLib</Name>
@@ -167,14 +171,6 @@
       <Project>{C1106A6B-E931-4592-8D3F-803830527436}</Project>
       <Name>PortableDevice</Name>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="libvlc.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="libvlccore.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

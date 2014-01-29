@@ -29,7 +29,8 @@ namespace MediaPlayer.Windows
     /// </summary>
     public partial class WinMediaPlayer : Window
     {
-        private double _volume;
+        private double _volume = 0;
+        private double _volumeQuickSteps = 30;
         private const double NominalVideoSpeed = 1.0;
         private MediaPlayState _mediaPlayState;
         private MediaFileType _mediaFileType;
@@ -41,6 +42,7 @@ namespace MediaPlayer.Windows
         private int _timeShift;
         private int _stepCount;
         private bool _isOpened;
+        private bool _hasTotalTime;
 //        private Uri _source = null;
         private string _source = string.Empty;
 
@@ -76,8 +78,8 @@ namespace MediaPlayer.Windows
             _isFastForward = false;
             _timeShift = 1;
             _stepCount = 0;
-            _volume = 1.0;
             _isOpened = false;
+            _hasTotalTime = false;
 
             _mediaServer = new PortableDevice.MediaServer();
             _mediaServer.Start();
@@ -107,8 +109,6 @@ namespace MediaPlayer.Windows
 
             _mediaServer.OnLoadingFinished += new EventHandler(_mediaServer_OnLoadingFinished);
 
-//            CalculateVolume(PicardLib.Settings.PersistentSettings.MediaPlayerVolumeDefault);
-
             _endTimer = new System.Timers.Timer();
             _endTimer.Interval = 300;
             _endTimer.AutoReset = true;
@@ -135,7 +135,7 @@ namespace MediaPlayer.Windows
             System.Diagnostics.Debug.WriteLine(string.Format("PlayState = {0}", (int)e.newState));
             if (e.newState == (int)WMPLib.WMPPlayState.wmppsPlaying)
             {
-                this._isOpened = true;
+                _isOpened = true;
             }
             else if (e.newState == (int)WMPLib.WMPPlayState.wmppsMediaEnded)
             {
@@ -203,10 +203,10 @@ namespace MediaPlayer.Windows
                 OnMediaEnded(this, new EventArgs());
         }
 
-        private void CalculateVolume(int volume)
+        private void CalculateVolume(double volume)
         {
-//            double volumeStep = 1.0 / AudioManager.VolumeQuickSteps;
-//            _volume = volumeStep * volume;
+            double volumeStep = 100.0 / _volumeQuickSteps;
+            _volume = (int)(volumeStep * volume);
         }
 
         public PortableDevice.PortableDeviceObject PortableObject
@@ -214,6 +214,7 @@ namespace MediaPlayer.Windows
             set
             {
                 _object = value;
+                _hasTotalTime = false;
                 if (_object != null)
                 {
                     PortableDevice.PortableDeviceFile item = _object as PortableDevice.PortableDeviceFile;
@@ -256,7 +257,9 @@ namespace MediaPlayer.Windows
                     double duration = mediaElementMainVideo.currentMedia.duration;
 
                     if (!(Math.Abs(duration - 0.0) < 0.001)) // Make sure the duration is bigger than 0.0
-                    { 
+                    {
+                        _hasTotalTime = true;
+
                         double currentPosition = mediaElementMainVideo.Ctlcontrols.currentPosition;
 
                         result = (int)(currentPosition / duration * 100.0);
@@ -276,7 +279,20 @@ namespace MediaPlayer.Windows
 
         public double MediaPlayerVolume
         {
-            get { return _volume; }
+            get 
+            {
+                return _volume; 
+            }
+            set 
+            {
+                CalculateVolume(value);
+            }
+        }
+
+        public double MediaPlayerVolumeQuickSteps
+        {
+            get { return _volumeQuickSteps; }
+            set { _volumeQuickSteps = value; }
         }
 
         public bool IsOpened
@@ -307,7 +323,7 @@ namespace MediaPlayer.Windows
                 mediaElementMainVideo.settings.rate = NominalVideoSpeed;
                 mediaElementMainVideo.settings.mute = _isMuted;
                 mediaElementMainVideo.Ctlcontrols.play();
-                mediaElementMainVideo.settings.volume = (int)(20 * _volume);
+                mediaElementMainVideo.settings.volume = (int)_volume;
                 _mediaPlayState = MediaPlayState.Play;
                 _isFastForward = true;
                 _timeShift = 1;
@@ -341,13 +357,15 @@ namespace MediaPlayer.Windows
                 _stepCount = 0;
             }
 
-            if (_timeShift >= 32)
-                _timeShift = 32;
+            if (_timeShift >= 16)
+                _timeShift = 16;
 
             if (_isFastForward)
                 shift = _timeShift * 1;
             else
                 shift = _timeShift * -1;
+
+            mediaElementMainVideo.Ctlcontrols.currentPosition += shift;
 
             _stepCount++;
         }
@@ -359,6 +377,7 @@ namespace MediaPlayer.Windows
 
             _isFastForward = true;
 
+            System.Diagnostics.Debug.WriteLine("FastForward");
             Pause();
             _endTimer.Start();
         }
@@ -368,6 +387,8 @@ namespace MediaPlayer.Windows
             if (!_endTimer.Enabled)
                 return;
 
+            System.Diagnostics.Debug.WriteLine("EndFastForward");
+            mediaElementMainVideo.Ctlcontrols.play();
             _endTimer.Stop();
             Play();
         }
@@ -379,6 +400,7 @@ namespace MediaPlayer.Windows
 
             _isFastForward = false;
 
+            System.Diagnostics.Debug.WriteLine("Rewind");
             Pause();
             _endTimer.Start();
         }
@@ -388,6 +410,7 @@ namespace MediaPlayer.Windows
             if (!_endTimer.Enabled)
                 return;
 
+            System.Diagnostics.Debug.WriteLine("EndRewind");
             _endTimer.Stop();
             Play();
         }
@@ -418,7 +441,8 @@ namespace MediaPlayer.Windows
                 _isFastForward = true;
                 _timeShift = 1;
                 _stepCount = 0;
-                if (this._mediaType == DeviceType.PortableDevice)
+                _hasTotalTime = false;
+                if (_mediaType == DeviceType.PortableDevice)
                     _mediaServer.Stop();
                 _isOpened = false;
             }
@@ -439,7 +463,7 @@ namespace MediaPlayer.Windows
                 _isMuted = mute;
 
                 if (!mute)
-                    mediaElementMainVideo.settings.volume = (int)(20 * _volume);
+                    mediaElementMainVideo.settings.volume = (int)_volume;
             }
             catch (Exception ex)
             {
@@ -455,8 +479,8 @@ namespace MediaPlayer.Windows
             Hide();
             var helper = new WindowInteropHelper(this);
             SetParent(helper.Handle, IntPtr.Zero);
-            this.Width = rect.Width;
-            this.Height = rect.Height;
+            Width = rect.Width;
+            Height = rect.Height;
             SetParent(helper.Handle, _hwndParent);
             Show();
         }
@@ -485,7 +509,7 @@ namespace MediaPlayer.Windows
 
         private void SAFE_mediaServer_OnLoadingFinished(object sender, EventArgs e)
         {
-      
+        
         }
         #endregion
 

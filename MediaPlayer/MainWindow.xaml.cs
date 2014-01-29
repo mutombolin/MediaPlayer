@@ -12,13 +12,16 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Interop;
-
+using System.IO;
+using System.IO.Pipes;
 using System.Management;
 
 using MediaPlayer.Common;
 using MediaPlayer.Settings;
 using MediaPlayer.Windows;
 using MediaPlayer.Managers;
+
+using JHTNA.modules.strings;
 
 namespace MediaPlayer
 {
@@ -33,13 +36,34 @@ namespace MediaPlayer
 
         private double _left = 0;
         private double _top = 300;
+        private double _volume = 30;
+        private double _volumeSteps = 30;
 
         private bool _isStandalone = true;
 
         private bool _isFullScreen = false;
+        private MediaPlayerServerState _mediaPlayerServerState;
+
+        private string _currentLanguageType = string.Empty;
+
+        private delegate void delegateUpdateLanguage(string msg);
+
+        #region MediaPlayerServerState
+        private enum MediaPlayerServerState
+        {
+            S_OK,
+            RegisterAudioSource,
+            VideoStart,
+            AudioStatePlaying,
+            AudioStatePaused,
+            AudioStateStopped
+        };
+        #endregion
 
         #region Named Pipe
         private const string PIPE_NAME = "namemediaplayerpipe";
+        private const string PIPE_SERVER_NAME = "namemediaplayerserverpipe";
+
         private PipeServer _pipeServer;
         #endregion
 
@@ -47,7 +71,11 @@ namespace MediaPlayer
         {
             InitializeComponent();
 
+            _currentLanguageType = LanguageType.English_UnitedStates.ToString();
+
             ProcessArgs(Environment.GetCommandLineArgs());
+
+            _mediaPlayerServerState = MediaPlayerServerState.S_OK;
 
             if (!_isStandalone)
             {
@@ -58,8 +86,17 @@ namespace MediaPlayer
 
                 _pipeServer = new PipeServer();
                 _pipeServer.PipeMessage += new DelegateMessage(_pipeServer_PipeMessage);
-                _pipeServer.VisibleEvent += new EventHandler(_pipeServer_VisibleEvent);
+                _pipeServer.StatusEvent += new EventHandler(_pipeServer_StatusEvent);
                 _pipeServer.Listen(PIPE_NAME);
+            }
+            else
+            { 
+#if DEBUG
+                _pipeServer = new PipeServer();
+                _pipeServer.PipeMessage += new DelegateMessage(_pipeServer_PipeMessage);
+                _pipeServer.StatusEvent += new EventHandler(_pipeServer_StatusEvent);
+                _pipeServer.Listen(PIPE_NAME);
+#endif
             }
 
             mediaPlayerListCtrl.ItemSelectionHandler += new MediaPlayerListCtrl.ItemSelection(mediaPlayerListCtrl_ItemSelectionHandler);
@@ -129,13 +166,40 @@ namespace MediaPlayer
             // Audio & Video Implement
 #if VLC
             if (VLCPlayer.Instance.MediaPlayState == MediaPlayState.Play)
+            {
+            
+            }
 #else
             if (WinMediaPlayer.Instance.MediaPlayState == MediaPlayState.Play)
-#endif
-            { 
-                
+            {
+                if (WinMediaPlayer.Instance.MediaPlayState == MediaPlayState.Play)
+                {
+                    if (!WinMediaPlayer.Instance.IsMuted)
+                    {
+                        _mediaPlayerServerState = MediaPlayerServerState.RegisterAudioSource;
+                    }
+
+                    if (WinMediaPlayer.Instance.MediaFileType == MediaFileType.Video)
+                    {
+                        _mediaPlayerServerState = MediaPlayerServerState.VideoStart;
+                    }
+
+                    if (false == _mediaEnded)
+                    {
+                        _mediaPlayerServerState = MediaPlayerServerState.AudioStatePlaying;
+                    }
+                }
+                else if (WinMediaPlayer.Instance.MediaPlayState == MediaPlayState.Pause)
+                {
+                    _mediaPlayerServerState = MediaPlayerServerState.AudioStatePaused;
+                }
+                else if (WinMediaPlayer.Instance.MediaPlayState == MediaPlayState.Stop)
+                {
+                    _mediaPlayerServerState = MediaPlayerServerState.AudioStateStopped;
+                }
             }
 
+#endif
             _mediaEnded = false;
         }
 
@@ -199,9 +263,20 @@ namespace MediaPlayer
                 Show();
             }
 
+//            string[] args = new string[2] { "MediaPlayer.exe", "lang=ChineseTraditional" };
+//            ProcessArgs(args);
+
             AddInsertUSBHandler();
             AddRemoveUSBHandler();
             MediaContentManager.Instance.Init();          
+
+            // Set language
+            LanguageChanged();
+#if VLC
+#else
+            WinMediaPlayer.Instance.MediaPlayerVolume = _volume;
+            WinMediaPlayer.Instance.MediaPlayerVolumeQuickSteps = _volumeSteps;
+#endif
         }
 
         public void MuteAudio(bool mute)
@@ -240,6 +315,15 @@ namespace MediaPlayer
         public void StartControl()
         { 
         
+        }
+
+        public void LanguageChanged()
+        {
+            if (_currentLanguageType == string.Empty)
+                _currentLanguageType = LanguageType.English_UnitedStates.ToString();
+
+            StringManager.Instance.LanguageType = (LanguageType)Enum.Parse(typeof(LanguageType), _currentLanguageType, false);
+            mediaPlayerListCtrl.LanguageChanged();
         }
 
         public void ResumeControl()
@@ -317,13 +401,15 @@ namespace MediaPlayer
         #endregion
 
         #region Named Pipe
-        private void _pipeServer_VisibleEvent(object sender, EventArgs e)
+        private void _pipeServer_StatusEvent(object sender, EventArgs e)
         {
-            _pipeServer.IsBrowserVisible = (this.Visibility == System.Windows.Visibility.Visible); 
+            _pipeServer.StatusMessage = _mediaPlayerServerState.ToString();
+            _mediaPlayerServerState = MediaPlayerServerState.S_OK;
         }
 
         private void _pipeServer_PipeMessage(string message)
         {
+            message = message.Replace("\r\n", "");
             ShowPipeMessage(message);
 
             try
@@ -340,13 +426,17 @@ namespace MediaPlayer
                 {
                     Dispatcher.BeginInvoke(new Action(StopWindow));
                 }
+                else if (message.ToLower().Contains("unmute"))
+                {
+                    Dispatcher.BeginInvoke(new Action(UnMuteWindow));
+                }
                 else if (message.ToLower().Contains("mute"))
                 {
                     Dispatcher.BeginInvoke(new Action(MuteWindow));
                 }
-                else if (message.ToLower().Contains("unmute"))
+                else if (message.ToLower().Contains("lang="))
                 {
-                    Dispatcher.BeginInvoke(new Action(UnMuteWindow));
+                    Dispatcher.BeginInvoke(new delegateUpdateLanguage(UpdateLanguage), message);
                 }
             }
             catch (Exception ex)
@@ -393,6 +483,12 @@ namespace MediaPlayer
             this.Show();
             this.Activate();
             this.Focus();
+            
+            if (WinMediaPlayer.Instance.MediaFileType == MediaFileType.Video)
+            {
+                _isFullScreen = false;
+                WinMediaPlayer.Instance.SetWindowSize(new Rect(0, 0, mediaPlayerListCtrl.ActualWidth, mediaPlayerListCtrl.ActualHeight));
+            }
         }
 
         private void StopWindow()
@@ -411,6 +507,19 @@ namespace MediaPlayer
             this.MuteAudio(false);
         }
 
+        private void UpdateLanguage(string msg)
+        {
+            foreach (LanguageType type in (LanguageType[])Enum.GetValues(typeof(LanguageType)))
+            {
+                if (string.Compare(msg, string.Format("lang={0}", type.ToString()), true) == 0)
+                {
+                    _currentLanguageType = type.ToString();
+                }
+            }
+
+            LanguageChanged();
+        }
+
         private void ShowBackground(bool show)
         {
             mediaPlayerListCtrl.Visibility = show ? System.Windows.Visibility.Hidden : System.Windows.Visibility.Visible;
@@ -427,24 +536,98 @@ namespace MediaPlayer
             return result;
         }
 
+        private string ExtractLanguageType(string original)
+        {
+            string result = string.Empty;
+
+            foreach (LanguageType type in (LanguageType[])Enum.GetValues(typeof(LanguageType)))
+            {
+                if (string.Compare(original, string.Format("lang={0}", type.ToString()), true) == 0)
+                {
+                    result = type.ToString();
+                    break;
+                }
+            }
+
+            return result;
+        }
+
         private void ProcessArgs(string[] args)
         {
             if (args.Count() <= 1)
                 return;
 
-            this._isStandalone = false;
-
             foreach (string arg in args)
             {
                 if (arg.ToLower().Contains("left="))
                 {
+                    _isStandalone = false;
                     _left = ExtractNumber(arg.ToLower());
                 }
                 else if (arg.ToLower().Contains("top="))
                 {
+                    _isStandalone = false;
                     _top = ExtractNumber(arg.ToLower());
                 }
+                else if (arg.ToLower().Contains("vol="))
+                {
+                    _volume = ExtractNumber(arg.ToLower());
+                }
+                else if (arg.ToLower().Contains("volsteps="))
+                {
+                    _volumeSteps = ExtractNumber(arg.ToLower());
+                }
+                else if (arg.ToLower().Contains("lang="))
+                {
+                    _currentLanguageType = ExtractLanguageType(arg.ToLower());
+                }
             }
+        }
+        #endregion
+
+        #region Named pipe
+        private void SendPipeCommand(string msg)
+        {
+            NamedPipeClientStream pipeClient = new NamedPipeClientStream(".", PIPE_SERVER_NAME, PipeDirection.Out, PipeOptions.None);
+
+            try
+            {
+                if (pipeClient.IsConnected != null)
+                    pipeClient.Connect(2000);
+
+
+                StreamWriter sw = new StreamWriter(pipeClient);
+
+                try
+                {
+                    sw.WriteLine(msg);
+                    sw.Flush();
+                    pipeClient.Close();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(string.Format("{0} - {1} {2}",
+                        System.Reflection.Assembly.GetExecutingAssembly().GetName().Name,
+                        ex,
+                        "Error connecting to Picard"));
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(string.Format("{0} - {1} {2}",
+                    System.Reflection.Assembly.GetExecutingAssembly().GetName().Name,
+                    ex,
+                    "Error connecting to namemediaplayerserverpipe"));
+            }
+            finally
+            {
+                pipeClient.Close();
+            }
+        }
+
+        private void ApplicationCommand(MediaPlayerServerState state)
+        {
+            SendPipeCommand(state.ToString());
         }
         #endregion
     }

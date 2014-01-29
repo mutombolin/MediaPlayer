@@ -18,6 +18,8 @@ using MediaPlayer.Windows;
 using MediaPlayer.Settings;
 using MediaPlayer.Managers;
 
+using JHTNA.modules.strings;
+
 namespace MediaPlayer
 {
     /// <summary>
@@ -152,7 +154,7 @@ namespace MediaPlayer
                     textBlockTitle.Text = System.IO.Path.GetFileNameWithoutExtension(WinMediaPlayer.Instance.FileName);
 #endif
                 else
-                    textBlockTitle.Text = string.Format("Buffering...");
+                    textBlockTitle.Text = StringManager.GetAppString(StringsConstApplication.Loading);
 
                 _showBuffering = !_showBuffering;
 
@@ -189,8 +191,24 @@ namespace MediaPlayer
             {
                 ThreeStateButtonArgs args = e as ThreeStateButtonArgs;
 
+#if VLC
                 if (MovePrevious != null)
                     MovePrevious(this, new EventArgs());
+#else
+                if (!args.IsAutoRepeat && (args.AutoRepeatCount == 0))
+                {
+                    if (MovePrevious != null)
+                        MovePrevious(this, new EventArgs());
+                }
+                else if (args.IsAutoRepeat && (args.AutoRepeatCount == 0))
+                {
+                    SetPlayState(MediaPlayState.StartRewind);
+                }
+                else if (!args.IsAutoRepeat && (args.AutoRepeatCount > 0))
+                {
+                    SetPlayState(MediaPlayState.EndRewind);
+                }
+#endif
             }
         }
 
@@ -225,9 +243,24 @@ namespace MediaPlayer
             if (e is MediaPlayer.Controls.ThreeStateButtonArgs)
             {
                 ThreeStateButtonArgs args = e as ThreeStateButtonArgs;
-
+#if VLC
                 if (MoveNext != null)
                     MoveNext(this, new EventArgs());
+#else
+                if (!args.IsAutoRepeat && (args.AutoRepeatCount == 0))
+                {
+                    if (MoveNext != null)
+                        MoveNext(this, new EventArgs());
+                }
+                else if (args.IsAutoRepeat && (args.AutoRepeatCount == 0))
+                {
+                    SetPlayState(MediaPlayState.StartFastForward);
+                }
+                else if (!args.IsAutoRepeat && (args.AutoRepeatCount > 0))
+                {
+                    SetPlayState(MediaPlayState.EndFastForward);
+                }
+#endif
             }
         }
 
@@ -265,6 +298,7 @@ namespace MediaPlayer
                     case MediaPlayState.Stop:
                         _progressTimer.Stop();
                         _textScrollTimer.Stop();
+                        _bufferingTimer.Stop();
 #if VLC
                         VLCPlayer.Instance.Stop();
                         VLCPlayer.Instance.Hide();
@@ -320,12 +354,29 @@ namespace MediaPlayer
                         NotifyStateChange();
                         break;
                     case MediaPlayState.StartFastForward:
+#if VLC
+                        
+#else
+                        WinMediaPlayer.Instance.FastForward();
+#endif
                         break;
                     case MediaPlayState.EndFastForward:
+#if VLC
+#else
+                        WinMediaPlayer.Instance.EndFastForward();
+#endif
                         break;
                     case MediaPlayState.StartRewind:
+#if VLC
+#else
+                        WinMediaPlayer.Instance.Rewind();
+#endif
                         break;
                     case MediaPlayState.EndRewind:
+#if VLC
+#else
+                        WinMediaPlayer.Instance.EndRewind();
+#endif
                         break;
                 }
             }

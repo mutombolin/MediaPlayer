@@ -14,7 +14,7 @@ namespace MediaPlayer
     class PipeServer
     {
         public event DelegateMessage PipeMessage;
-        public event EventHandler VisibleEvent;
+        public event EventHandler StatusEvent;
 
         string _pipeName;
         public bool _InOut = true;
@@ -54,7 +54,8 @@ namespace MediaPlayer
                 pipeServer.Read(buffer, 0, 255);
 
                 // Convert byte buffer to string
-                string stringData = Encoding.UTF8.GetString(buffer, 0, buffer.Length);
+//                string stringData = Encoding.UTF8.GetString(buffer, 0, buffer.Length);
+                string stringData = Encoding.Default.GetString(buffer).TrimEnd('\0');
                 //                Debug.WriteLine(stringData + Environment.NewLine);
 
                 if (stringData.ToLower().Contains("read"))
@@ -72,9 +73,9 @@ namespace MediaPlayer
                 }
                 else
                 {
-                    VisibleEvent(this, new EventArgs());
+                    StatusEvent(this, new EventArgs());
                     byte[] recBuffer = new byte[255];
-                    recBuffer = System.Text.Encoding.Default.GetBytes(IsBrowserVisible.ToString());
+                    recBuffer = System.Text.Encoding.Default.GetBytes(StatusMessage);
                     pipeServer.Write(recBuffer, 0, recBuffer.Length);
                 }
 
@@ -93,5 +94,6 @@ namespace MediaPlayer
         }
 
         public bool IsBrowserVisible { set; get; }
+        public string StatusMessage { set; get; }
     }
 }
