@@ -208,8 +208,6 @@ namespace PortableDevice
 
             values.GetUnsignedIntegerValue(WPD_MEDIA_DURATION, out duration);
 
-            System.Diagnostics.Debug.WriteLine(string.Format("name = {0} duration = {1}", file.Name, duration));
-
             return duration;
         }
 

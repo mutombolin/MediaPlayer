@@ -27,7 +27,6 @@ namespace PortableDevice
         private bool _isStarted = false;
         private Thread _requestThread;
         private bool _isStopping = false;
-        private int _numberOfRequest;
         private System.Runtime.InteropServices.ComTypes.IStream _sourceStream;
 
         public event EventHandler OnLoadingFinished;
@@ -113,7 +112,6 @@ namespace PortableDevice
             _requestThread.Name = "RequestThread";
             _requestThread.Start();
 
-            _numberOfRequest = 0;
             _sourceStream = null;
         }
 
@@ -150,13 +148,8 @@ namespace PortableDevice
                 PortableDevice device = this._device;
                 PortableDeviceFile file = this._file;
 
-//                device.Connect();
-
                 IPortableDeviceContent content;
-//                device.PortableDeviceClass.Content(out content);
-
                 IPortableDeviceResources resources;
-//                content.Transfer(out resources);
 
                 PortableDeviceApiLib.IStream wpdStream;
                 uint optimalTransferSize = 0;

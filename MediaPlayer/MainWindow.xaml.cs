@@ -255,8 +255,8 @@ namespace MediaPlayer
 
         void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-/*
-            if (!_isStandalone)
+
+            if (!_isStandalone && _isVisible)
             {
                 Hide();
 
@@ -270,9 +270,6 @@ namespace MediaPlayer
 
                 Show();
             }
-*/
-//            string[] args = new string[2] { "MediaPlayer.exe", "lang=ChineseTraditional" };
-//            ProcessArgs(args);
 
             AddInsertUSBHandler();
             AddRemoveUSBHandler();
@@ -323,10 +320,8 @@ namespace MediaPlayer
         public void StartControl()
         {
 
-            if (!_isStandalone)
+            if (!_isStandalone && !_isVisible)
             {
-//                Hide();
-
                 this.Left = _left;
                 this.Top = _top;
 
@@ -340,7 +335,7 @@ namespace MediaPlayer
                     HookWindows.Instance.HookMainWindow(hostHandle, guestHandle);
                 }
 
-                Show();
+//                Show();
             }
 
         }
@@ -543,8 +538,13 @@ namespace MediaPlayer
 
         private void StopWindow()
         {
+            Hide();
+            IntPtr guestHandle = new WindowInteropHelper(this).Handle;
+
+            if (guestHandle != IntPtr.Zero)
+                HookWindows.Instance.HookMainWindow(IntPtr.Zero, guestHandle);
+
             Close();
-            App.Current.Shutdown();
         }
 
         private void MuteWindow()
