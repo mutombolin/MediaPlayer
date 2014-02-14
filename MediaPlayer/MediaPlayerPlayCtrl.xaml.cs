@@ -99,6 +99,8 @@ namespace MediaPlayer
             rectangleProgressForeground.Width = pixelsPerPercent * VLCPlayer.Instance.PercentProgress;
 #else
             rectangleProgressForeground.Width = pixelsPerPercent * WinMediaPlayer.Instance.PercentProgress;
+            TimeSpan ts = TimeSpan.FromSeconds(WinMediaPlayer.Instance.Duration);
+            textBlockDuration.Text = string.Format("{0:d2} : {1:d2}", ts.Minutes, ts.Seconds);
 #endif
         }
 
@@ -181,6 +183,9 @@ namespace MediaPlayer
             WinMediaPlayer.Instance.PortableObject = _currentObject;
             WinMediaPlayer.Instance.FileName = _currentObject.Name;
 #endif
+            if (WinMediaPlayer.Instance.MediaPlayState != MediaPlayState.Stop)
+                SetPlayState(MediaPlayState.Stop);
+
             if (_currentObject != null)
                 SetPlayState(MediaPlayState.Play);
         }
@@ -309,6 +314,8 @@ namespace MediaPlayer
                         rectangleProgressForeground.Width = 0;
                         rectangleProgressForeground.Visibility = System.Windows.Visibility.Hidden;
                         rectangleProgressBackground.Visibility = System.Windows.Visibility.Hidden;
+                        textBlockDuration.Text = string.Empty;
+                        textBlockDuration.Visibility = System.Windows.Visibility.Hidden;
                         textBlockTitle.Text = string.Empty;
 #if VLC
                         VLCPlayer.Instance.FileName = string.Empty;
@@ -322,6 +329,7 @@ namespace MediaPlayer
                         textBlockTitle.BeginAnimation(Canvas.LeftProperty, null);
                         rectangleProgressForeground.Visibility = System.Windows.Visibility.Visible;
                         rectangleProgressBackground.Visibility = System.Windows.Visibility.Visible;
+                        textBlockDuration.Visibility = System.Windows.Visibility.Visible;
 #if VLC
                         VLCPlayer.Instance.Pause();
                         VLCPlayer.Instance.Hide();
@@ -334,6 +342,8 @@ namespace MediaPlayer
                     case MediaPlayState.Play:
                         rectangleProgressForeground.Visibility = System.Windows.Visibility.Visible;
                         rectangleProgressBackground.Visibility = System.Windows.Visibility.Visible;
+                        textBlockDuration.Text = string.Empty;
+                        textBlockDuration.Visibility = System.Windows.Visibility.Visible;
 #if VLC
                         VLCPlayer.Instance.Play();
                         if ((ShowVideo != null) && (VLCPlayer.Instance.MediaFileType == MediaFileType.Video))

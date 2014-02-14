@@ -63,5 +63,6 @@
             <Rectangle Grid.Row="1" Name="rectangleProgressBackground" Height="5" Fill="#808080" HorizontalAlignment="Left" Width="250" VerticalAlignment="Center" Margin="0" />
             <Rectangle Grid.Row="1" Name="rectangleProgressForeground" Height="5" Fill="White" HorizontalAlignment="Left" Width="0" VerticalAlignment="Center" Margin="0" />
         </Grid>
+        <TextBlock Grid.Row="1" Name="textBlockDuration" FontFamily="Arial" FontSize="16" Text="00 : 00" Foreground="LightSteelBlue" Height="18" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="2" />
     </Grid>
 </UserControl>

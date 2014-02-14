@@ -30,9 +30,8 @@ namespace PortableDevice
         private int _numberOfRequest;
         private System.Runtime.InteropServices.ComTypes.IStream _sourceStream;
 
-        private ManualResetEvent resetEvent;
-
         public event EventHandler OnLoadingFinished;
+        private EventWaitHandle _waitStopEvent;
 
         private PortableDevice _device;
         private PortableDeviceFile _file;
@@ -42,7 +41,7 @@ namespace PortableDevice
             _listener = new HttpListener();
             _listener.Prefixes.Add("http://localhost:7896/");
             _listener.AuthenticationSchemes = AuthenticationSchemes.Anonymous;
-            resetEvent = new ManualResetEvent(false);
+            _waitStopEvent = new EventWaitHandle(false, EventResetMode.ManualReset);
         }
 
         private void RequestThread()
@@ -63,18 +62,13 @@ namespace PortableDevice
 
         private void ListenerCallback(IAsyncResult ar)
         {
-/*            lock (this)
+            if (_isStarted)
             {
-                resetEvent.Reset();
-                _numberOfRequest++;
+                _isStopping = true;
+                _waitStopEvent.WaitOne();
             }
-*/
-            while (_isStopping)
-                Thread.Sleep(100);
 
             var listener = ar.AsyncState as HttpListener;
-
-            System.Diagnostics.Debug.WriteLine(string.Format("ListenerCallback numberOfRequest = {0}", _numberOfRequest));
 
             _isStarted = true;
 
@@ -84,29 +78,18 @@ namespace PortableDevice
             {
                 WriteFile((HttpListenerContext)ctx);
             }, context, System.Threading.Tasks.TaskCreationOptions.LongRunning);
-/*
-            lock (this)
-            {
-                if (--_numberOfRequest == 0)
-                    resetEvent.Set();
-            }
-*/
         }
 
         public void Stop()
         {
-/*            lock (this)
+            if (_isStarted)
             {
                 _isStopping = true;
+                System.Diagnostics.Debug.WriteLine("========= Stop WaitOne ==========");
+                _waitStopEvent.WaitOne();
             }
-*/
-//            if (_isStarted)
-//                resetEvent.WaitOne();
-
-            if (_isStarted)
-                _isStopping = true;
             _isStarted = false;
-            System.Diagnostics.Debug.WriteLine("Listener Stopped");
+            _waitStopEvent.Reset();
         }
 
         public void Dispose()
@@ -142,6 +125,7 @@ namespace PortableDevice
             }
         }
 
+
         private static IntPtr ReadBuffer;
 
         private static int IStreamRead(System.Runtime.InteropServices.ComTypes.IStream stream, byte[] buffer)
@@ -159,13 +143,6 @@ namespace PortableDevice
             if ((this._device == null) || (this._file == null))
                 return;
 
-            while (_sourceStream != null)
-            {
-                _sourceStream.Commit(0);
-                _sourceStream = null;
-                Thread.Sleep(50);
-            }
-
             try
             {
                 var response = ctx.Response;
@@ -173,13 +150,13 @@ namespace PortableDevice
                 PortableDevice device = this._device;
                 PortableDeviceFile file = this._file;
 
-                device.Connect();
+//                device.Connect();
 
                 IPortableDeviceContent content;
-                device.PortableDeviceClass.Content(out content);
+//                device.PortableDeviceClass.Content(out content);
 
                 IPortableDeviceResources resources;
-                content.Transfer(out resources);
+//                content.Transfer(out resources);
 
                 PortableDeviceApiLib.IStream wpdStream;
                 uint optimalTransferSize = 0;
@@ -188,7 +165,27 @@ namespace PortableDevice
                 property.fmtid = new Guid(0xE81E79BE, 0x34F0, 0x41BF, 0xB5, 0x3F, 0xF1, 0xA0, 0x6A, 0xE8, 0x78, 0x42);
                 property.pid = 0;
 
-                resources.GetStream(file.Id, ref property, 0, ref optimalTransferSize, out wpdStream);
+                while (true)
+                {
+                    try
+                    {
+                        device.Disconnect();
+                        device.Connect();
+                        device.PortableDeviceClass.Content(out content);
+                        content.Transfer(out resources);
+
+                        resources.GetStream(file.Id, ref property, 0, ref optimalTransferSize, out wpdStream);
+
+                        content.Cancel();
+                    }
+                    catch (Exception ex)
+                    {
+                        Thread.Sleep(100);
+                        continue;
+                    }
+                    break;
+                }
+
                 _sourceStream = (System.Runtime.InteropServices.ComTypes.IStream)wpdStream;
 
                 response.ContentLength64 = 0;
@@ -196,7 +193,7 @@ namespace PortableDevice
                 response.ContentType = System.Net.Mime.MediaTypeNames.Application.Octet;
                 response.AddHeader("Content-disposition", "attachment; filename=1.mp4");
 
-                byte[] buffer = new byte[64 * 1024];
+                byte[] buffer = new byte[64*1024];
                 int read;
                 int Count = 0;
 
@@ -224,8 +221,12 @@ namespace PortableDevice
                             break;
                     } while (read > 0);
 
-                    _sourceStream.Commit(0);
-                    _sourceStream = null;
+                    try
+                    {
+                        _sourceStream.Commit(0);
+                        _sourceStream = null;
+                    }
+                    catch { }
 
                     _isStopping = false;
 
@@ -238,9 +239,7 @@ namespace PortableDevice
                         System.Diagnostics.Debug.WriteLine(string.Format("Exception ex = {0}", ex));
                     }
                 }
-                System.Diagnostics.Debug.WriteLine(string.Format("Count = {0}", Count));
                 OnLoadingFinished(this, new EventArgs());
-
                 response.StatusCode = (int)HttpStatusCode.OK;
                 response.StatusDescription = "OK";
                 response.OutputStream.Close();
@@ -252,10 +251,9 @@ namespace PortableDevice
                     ex,
                     "MediaServer WriteFile Exception!"));
             }
-            finally
-            {
-                _isStarted = false;
-            }
+
+            _waitStopEvent.Set();
+            _isStarted = false;
         }
 
         public string FileName

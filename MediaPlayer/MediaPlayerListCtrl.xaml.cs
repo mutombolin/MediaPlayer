@@ -28,8 +28,10 @@ namespace MediaPlayer
         private const string SELECTED_IMAGE = "c:\\apps\\themes\\picard\\images\\apps\\mediaplayer\\mediaplayer_selected.png";
         private const string UNSELECTED_IMAGE = "c:\\apps\\themes\\picard\\images\\apps\\mediaplayer\\mediaplayer_unselected.png";
 
-        private bool _inAudio = false;
+        private bool _inAudio = true;
         private int _selectedIndex;
+        private int _audioSelectedIndex = -1;
+        private int _videoSelectedIndex = -1;
         private int _totalItems;
 
         public delegate void ItemSelection(PortableDevice.PortableDeviceObject obj, MediaFileType mediaFileType);
@@ -105,10 +107,13 @@ namespace MediaPlayer
         {
 //            System.Diagnostics.Debug.WriteLine("SAFE_Instance_MediaFound");
 
-            if (MediaContentManager.Instance.MusicPlayList.Count > 0)
-                _inAudio = true;
-            else
-                _inAudio = false;
+            if (!MediaContentManager.Instance.IsSearching && _totalItems == 0)
+            {
+                if (MediaContentManager.Instance.MusicPlayList.Count > 0)
+                    _inAudio = true;
+                else
+                    _inAudio = false;
+            }
 
             if (_inAudio)
                 ShowAudio();
@@ -134,28 +139,34 @@ namespace MediaPlayer
 
         private void ShowAudio()
         {
+            if (!_inAudio && MediaContentManager.Instance.IsSearching)
+                ContentClear();
+
             _inAudio = true;
             SwapImage(imageVideo, UNSELECTED_IMAGE);
             SwapImage(imageAudio, SELECTED_IMAGE);
 
-            if (MediaContentManager.Instance.IsSearching)
-                ShowMessage(StringManager.GetAppString(StringsConstApplication.PleaseWaitSearchingForAudio));
-            else if (MediaContentManager.Instance.IsMusicFilesFound)
+            if (MediaContentManager.Instance.IsMusicFilesFound)
                 ShowContent(MediaContentManager.Instance.MusicPlayList);
+            else if (MediaContentManager.Instance.IsSearching)
+                ShowMessage(StringManager.GetAppString(StringsConstApplication.PleaseWaitSearchingForAudio));
             else
                 ShowMessage(StringManager.GetAppString(StringsConstApplication.SearchingForMedia));
         }
 
         private void ShowVideo()
         {
+            if (_inAudio && MediaContentManager.Instance.IsSearching)
+                ContentClear();
+
             _inAudio = false;
             SwapImage(imageAudio, UNSELECTED_IMAGE);
             SwapImage(imageVideo, SELECTED_IMAGE);
 
-            if (MediaContentManager.Instance.IsSearching)
-                ShowMessage(StringManager.GetAppString(StringsConstApplication.PleaseWaitSearchingForVideo));
-            else if (MediaContentManager.Instance.IsVideoFilesFound)
+            if (MediaContentManager.Instance.IsVideoFilesFound)
                 ShowContent(MediaContentManager.Instance.VideoPlayList);
+            else if (MediaContentManager.Instance.IsSearching)
+                ShowMessage(StringManager.GetAppString(StringsConstApplication.PleaseWaitSearchingForVideo));
             else
                 ShowMessage(StringManager.GetAppString(StringsConstApplication.SearchingForMedia));
         }
@@ -171,8 +182,15 @@ namespace MediaPlayer
 
         private void ShowContent(List<PortableDevice.PortableDeviceObject> PlayList)
         {
-            _selectedIndex = -1;
-            _totalItems = PlayList.Count;
+            if (_inAudio)
+                _selectedIndex = _audioSelectedIndex;
+            else
+                _selectedIndex = _videoSelectedIndex;
+
+            List<PortableDevice.PortableDeviceObject> list = new List<PortableDevice.PortableDeviceObject>();
+            list.AddRange(PlayList);
+
+            _totalItems = list.Count;
 
             if (_totalItems <= 0)
             {
@@ -183,23 +201,51 @@ namespace MediaPlayer
 
             scrollViewerItems.Visibility = System.Windows.Visibility.Visible;
             textBlockMessage.Visibility = System.Windows.Visibility.Hidden;
-            stackPanelItems.Children.Clear();
+
+            if (!MediaContentManager.Instance.IsSearching)
+            {
+                stackPanelItems.Children.Clear();
+            }
 
             bool isAlt = false;
-            int index = 0;
 
-            foreach (PortableDevice.PortableDeviceObject obj in PlayList)
+            if (stackPanelItems.Children.Count != 0)
             {
+                MediaPlayerListItemCtrl listItem = (MediaPlayerListItemCtrl)stackPanelItems.Children[stackPanelItems.Children.Count - 1];
+                if (listItem != null)
+                    isAlt = !listItem.IsAlt;
+            }
+
+            for (int i = stackPanelItems.Children.Count; i < list.Count; i++)
+            {
+                PortableDevice.PortableDeviceObject obj = list[i];
+
+                if (obj == null)
+                    continue;
+                
                 MediaPlayerListItemCtrl listItem = new MediaPlayerListItemCtrl();
-                listItem.FileName = obj.Name;
+                string filename = obj.Name.Substring(0, obj.Name.LastIndexOf('.'));
+                listItem.FileName = filename;
                 listItem.ListItemSelect += new EventHandler(listItem_ListItemSelect);
                 listItem.ListItemHighlight += new EventHandler(listItem_ListItemHighlight);
                 listItem.IsAlt = isAlt;
-                listItem.Index = index++;
+                listItem.Index = i;
                 isAlt = !isAlt;
                 listItem.PortableObject = obj;
 
                 stackPanelItems.Children.Add(listItem);
+            }
+
+            foreach (MediaPlayerListItemCtrl selectedListItem in stackPanelItems.Children)
+            {
+                if (selectedListItem.IsSelected)
+                    selectedListItem.IsSelected = false;
+            }
+
+            if ((_selectedIndex < stackPanelItems.Children.Count) && (_selectedIndex >= 0))
+            {
+                MediaPlayerListItemCtrl listItem = (MediaPlayerListItemCtrl)stackPanelItems.Children[_selectedIndex];
+                listItem.IsSelected = true;
             }
         }
 
@@ -220,6 +266,11 @@ namespace MediaPlayer
 
                 listItem.IsSelected = true;
                 _selectedIndex = listItem.Index;
+
+                if (_inAudio)
+                    _audioSelectedIndex = _selectedIndex;
+                else
+                    _videoSelectedIndex = _selectedIndex;
 
                 ScrollToItem(listItem);
             }
@@ -251,12 +302,6 @@ namespace MediaPlayer
             if (_totalItems <= 0)
                 return;
 
-/*            if (_selectedIndex == -1)
-            {
-                MediaPlayerListItemCtrl selectedListItem = (MediaPlayerListItemCtrl)stackPanelItems.Children[_selectedIndex];
-                selectedListItem.IsSelected = false;
-            }
-*/
             foreach (MediaPlayerListItemCtrl selectedListItem in stackPanelItems.Children)
             {
                 if (selectedListItem.IsSelected)
@@ -287,6 +332,11 @@ namespace MediaPlayer
             if (ItemSelectionHandler != null)
                 ItemSelectionHandler(listItem.PortableObject, _inAudio ? MediaFileType.Audio : MediaFileType.Video);
 
+            if (_inAudio)
+                _audioSelectedIndex = _selectedIndex;
+            else
+                _videoSelectedIndex = _selectedIndex;
+
             ScrollToItem(listItem);
         }
 
@@ -294,8 +344,6 @@ namespace MediaPlayer
         {
             MediaContentManager.Instance.MediaFound -= Instance_MediaFound;
             MediaContentManager.Instance.Stop();
-//            PortableDeviceHelper.Instance.LoadedCompleted -= Instance_LoadedCompleted;
-//            PortableDeviceHelper.Instance.Stop();
         }
 
         private void ScrollToItem(MediaPlayerListItemCtrl item)

@@ -27,6 +27,8 @@ namespace MediaPlayer.Managers
         private List<string> _musicExtList = new List<string>();
         private List<string> _videoExtList = new List<string>();
 
+        private List<string> _folderHighPriorityList = new List<string>();
+
         private List<PortableDevice.PortableDeviceObject> _musicPlayList = new List<PortableDevice.PortableDeviceObject>();
         private List<PortableDevice.PortableDeviceObject> _videoPlayList = new List<PortableDevice.PortableDeviceObject>();
 
@@ -38,8 +40,15 @@ namespace MediaPlayer.Managers
         private bool _isSearchingMusic = false;
         private bool _isSearchingVideo = false;
         private bool _isSearching = false;
+        private bool _pauseSearching = false;
+        private bool _isPaused = false;
+        private bool _isPausing = false;
+
+        private bool _isHierarchyMode = false;
 
         private System.Timers.Timer _deviceSearchTimer;
+
+        private System.Timers.Timer _contentUpdateTimer;
 
         #region Events
         public event EventHandler MediaFound;
@@ -55,6 +64,10 @@ namespace MediaPlayer.Managers
             this._deviceSearchTimer = new System.Timers.Timer();
             this._deviceSearchTimer.Interval = 3000;
             this._deviceSearchTimer.Elapsed += new System.Timers.ElapsedEventHandler(_deviceSearchTimer_Elapsed);
+
+            this._contentUpdateTimer = new System.Timers.Timer();
+            this._contentUpdateTimer.Interval = 3000;
+            this._contentUpdateTimer.Elapsed += new System.Timers.ElapsedEventHandler(_contentUpdateTimer_Elapsed);
         }
 
         static MediaContentManager()
@@ -97,6 +110,17 @@ namespace MediaPlayer.Managers
             get { return this._isSearching; }
         }
 
+        public bool IsPaused
+        {
+            get 
+            {
+                if (_isPausing)
+                    return false;
+                else
+                    return this._isPaused; 
+            }
+        }
+
         public bool IsMusicFilesFound
         {
             get
@@ -124,6 +148,12 @@ namespace MediaPlayer.Managers
                 return false;
             }
         }
+
+        public bool IsHierarchyMode
+        {
+            get { return _isHierarchyMode; }
+            set { _isHierarchyMode = value;}
+        }
         #endregion
 
         #region Init method
@@ -136,6 +166,7 @@ namespace MediaPlayer.Managers
             this._videoPlayList.Clear();
             this._musicExtList.Clear();
             this._videoExtList.Clear();
+            this._folderHighPriorityList.Clear();
 
             this._musicExtList.Add("mp3");
             this._musicExtList.Add("wav");
@@ -148,6 +179,11 @@ namespace MediaPlayer.Managers
             this._videoExtList.Add("wmv");
             this._videoExtList.Add("avi");
 
+            this._folderHighPriorityList.Add("music");
+            this._folderHighPriorityList.Add("musics");
+            this._folderHighPriorityList.Add("video");
+            this._folderHighPriorityList.Add("videos");
+
             OnUpdateMedia(this, new EventArgs());
             this.StartSearch();
         }
@@ -158,6 +194,23 @@ namespace MediaPlayer.Managers
         {
             this._deviceSearchTimer.Stop();
             this._deviceSearchTimer.Start();
+        }
+
+        public void PauseSearch()
+        {
+            if (_isSearching)
+            {
+                _pauseSearching = true;
+                _isPausing = true;
+            }
+        }
+
+        public void ResumeSearch()
+        {
+            if (_isSearching && _pauseSearching)
+            {
+                _pauseSearching = false;
+            }
         }
         #endregion
 
@@ -219,8 +272,6 @@ namespace MediaPlayer.Managers
 
                                 this._anyReady = true;
 
-                                //                                _currentDevice = devices[deviceCount - 1];
-
                                 foreach (PortableObject deviceObj in _portableObjectList)
                                 {
                                     GetMusicVideoFiles(deviceObj);
@@ -229,6 +280,8 @@ namespace MediaPlayer.Managers
 
                             if ((this._musicPlayList.Count > 0) || (this._videoPlayList.Count > 0))
                                 OnMediaFound(this, new EventArgs());
+                            else
+                                OnNoMediaFound(this, new EventArgs());
 
                             if (!this._anyReady)
                             {
@@ -291,6 +344,13 @@ namespace MediaPlayer.Managers
         }
         #endregion
 
+        #region Content update timer
+        void _contentUpdateTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+
+        }
+        #endregion
+
         #region GetMusicFiles method
         private void GetMusicFiles(PortableDevice.PortableDevice device)
         { 
@@ -317,15 +377,154 @@ namespace MediaPlayer.Managers
 
                 device.Connect();
 
-                var folder = device.GetContents();
+                Dictionary<PortableDevice.PortableDeviceFolder, string> dicFolders = new Dictionary<PortableDevice.PortableDeviceFolder, string>();
+                Dictionary<PortableDevice.PortableDeviceFolder, string> dicPriorityFolders = new Dictionary<PortableDevice.PortableDeviceFolder, string>();
 
-                if (folder != null)
+                PortableDevice.PortableDeviceFolder folder;
+
+                bool searchFirst = false;
+                bool isPrioritySearch = false;
+
+                bool update = false;
+                int currentMusicCount = 0;
+                int currentVideoCount = 0;
+
+                string topPath = string.Empty;
+                string currentPath = string.Empty;
+                string tmpPath = string.Empty;
+
+                do
                 {
+                    while (_pauseSearching)
+                    {
+                        _isPausing = false;
+
+                        _isPaused = true;
+                        Thread.Sleep(5000);
+                    }
+
+                    _isPaused = false;
+
+                    if (dicFolders.Count == 0)
+                    {
+                        folder = device.GetContents(new PortableDevice.PortableDeviceFolder("DEVICE", "DEVICE"));
+                    }
+                    else
+                    {
+                        PortableDevice.PortableDeviceFolder root;
+
+                        string name = string.Empty;
+
+                        if (dicPriorityFolders.Count > 0)
+                        {
+                            isPrioritySearch = true;
+
+                            root = dicPriorityFolders.First().Key;
+                            name = dicPriorityFolders.First().Value;
+/*
+                            var root = dicPriorityFolders.First();
+
+                            folder = device.GetContents(new PortableDevice.PortableDeviceFolder(root.Key.Id, root.Key.Name));
+
+                            if (currentPath == string.Empty)
+                                currentPath = folder.Name;
+                            else
+                                currentPath = root.Value;
+                            dicPriorityFolders.Remove(root.Key);
+*/
+                        }
+                        else
+                        {
+                            isPrioritySearch = false;
+
+                            root = dicFolders.First().Key;
+                            name = dicFolders.First().Value;
+/*
+                            var root = dicFolders.First();
+                            try
+                            {
+                                folder = device.GetContents(new PortableDevice.PortableDeviceFolder(root.Key.Id, root.Key.Name));
+                            }
+                            catch { continue; }
+
+                            if (currentPath == string.Empty)
+                                currentPath = folder.Name;
+                            else
+                                currentPath = root.Value;
+
+                            dicFolders.Remove(root.Key);
+*/
+                        }
+
+                        try
+                        {
+                            folder = device.GetContents(new PortableDevice.PortableDeviceFolder(root.Id, root.Name));
+                        }
+                        catch { _pauseSearching = true; continue; }
+
+                        if (currentPath == string.Empty)
+                            currentPath = folder.Name;
+                        else
+                            currentPath = name;
+
+                        if (isPrioritySearch)
+                            dicPriorityFolders.Remove(root);
+                        else
+                            dicFolders.Remove(root);
+                    }
+
                     foreach (var item in folder.Files)
                     {
-                        GetObject(item);
+                        if (item is PortableDevice.PortableDeviceFolder)
+                        {
+                            if (item.Name == string.Empty)
+                                continue;
+
+                            string folderLowCase = item.Name.ToLower();
+
+                            if (_folderHighPriorityList.Contains(folderLowCase))
+                                searchFirst = true;
+
+                            if (searchFirst || isPrioritySearch)
+                            {
+                                dicPriorityFolders.Add(item as PortableDevice.PortableDeviceFolder, currentPath + "\\" + item.Name);        
+                                searchFirst = false;
+                            }
+                            else
+                            {
+                                dicFolders.Add(item as PortableDevice.PortableDeviceFolder, currentPath + "\\" + item.Name);
+                            }
+                        }
+                        else
+                        {
+                            PortableDevice.PortableDeviceFile fileItem = item as PortableDevice.PortableDeviceFile;
+
+                            string ext = fileItem.Name.ToLower().Substring(item.Name.ToLower().LastIndexOf('.') + 1);
+                            fileItem.Path = currentPath + "\\" + fileItem.Name;
+
+                            _currentPortableObj.ObjectList.Add(fileItem.Id);
+
+                            if (_musicExtList.Contains(ext))
+                            {
+                                _musicPlayList.Add(fileItem as PortableDevice.PortableDeviceObject);
+                            }
+                            else if (_videoExtList.Contains(ext))
+                            {
+                                _videoPlayList.Add(fileItem as PortableDevice.PortableDeviceObject);
+                            }
+                        }
                     }
-                }
+
+                    if ((this._musicPlayList.Count != currentMusicCount) || (this._videoPlayList.Count != currentVideoCount))
+                        update = true;
+
+                    if (update)
+                        OnMediaFound(this, new EventArgs());
+
+                    update = false;
+                    currentMusicCount = this._musicPlayList.Count;
+                    currentVideoCount = this._videoPlayList.Count;
+                } while (dicFolders.Count > 0);
             }
             catch (Exception ex)
             {
@@ -336,50 +535,54 @@ namespace MediaPlayer.Managers
             }
             finally
             {
-//                device.Disconnect();
-                this._isSearching = false;
             }
+            this._isSearching = false;
         }
 
         private void GetObject(PortableDevice.PortableDeviceObject obj)
         {
             if (obj is PortableDevice.PortableDeviceFolder)
-                GetFolderContents((PortableDevice.PortableDeviceFolder)obj, string.Empty);
+                GetFolderContents((PortableDevice.PortableDeviceFolder)obj, string.Empty, 0);
         }
 
-        private void GetFolderContents(PortableDevice.PortableDeviceFolder folder, string path)
+        private void GetFolderContents(PortableDevice.PortableDeviceFolder folder, string path, int hierarchy)
         {
             string currentPath = string.Empty;
+
+            hierarchy++;
 
             if (path == string.Empty)
                 currentPath = folder.Name;
             else
                 currentPath = path + "\\" + folder.Name;
 
+            System.Diagnostics.Debug.WriteLine(string.Format("hierarchy = {0}", hierarchy));
+
             foreach (var item in folder.Files)
             {
-                if (item is PortableDevice.PortableDeviceFolder)
+                if (item != null)
                 {
-                    GetFolderContents((PortableDevice.PortableDeviceFolder)item, currentPath);
-                }
-                else
-                {
-                    PortableDevice.PortableDeviceFile fileItem = item as PortableDevice.PortableDeviceFile;
-
-                    string ext = fileItem.Name.ToLower().Substring(item.Name.ToLower().LastIndexOf('.') + 1);
-                    fileItem.Path = currentPath + "\\" + fileItem.Name;
-
-                    _currentPortableObj.ObjectList.Add(fileItem.Id);
-
-                    if (_musicExtList.Contains(ext))
+                    if (item is PortableDevice.PortableDeviceFolder)
                     {
-                        _musicPlayList.Add(fileItem as PortableDevice.PortableDeviceObject);
-//                        _musicPlayDictionary.Add(item.Name, item as PortableDevice.PortableDeviceObject);
+                        GetFolderContents((PortableDevice.PortableDeviceFolder)item, currentPath, hierarchy);
                     }
-                    else if (_videoExtList.Contains(ext))
+                    else
                     {
-                        _videoPlayList.Add(fileItem as PortableDevice.PortableDeviceObject);
-//                        _videoPlayDictionary.Add(item.Name, item as PortableDevice.PortableDeviceObject);
+                        PortableDevice.PortableDeviceFile fileItem = item as PortableDevice.PortableDeviceFile;
+
+                        string ext = fileItem.Name.ToLower().Substring(item.Name.ToLower().LastIndexOf('.') + 1);
+                        fileItem.Path = currentPath + "\\" + fileItem.Name;
+
+                        _currentPortableObj.ObjectList.Add(fileItem.Id);
+
+                        if (_musicExtList.Contains(ext))
+                        {
+                            _musicPlayList.Add(fileItem as PortableDevice.PortableDeviceObject);
+                        }
+                        else if (_videoExtList.Contains(ext))
+                        {
+                            _videoPlayList.Add(fileItem as PortableDevice.PortableDeviceObject);
+                        }
                     }
                 }
             }

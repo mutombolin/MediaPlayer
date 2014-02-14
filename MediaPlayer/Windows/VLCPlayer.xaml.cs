@@ -41,7 +41,6 @@ namespace MediaPlayer.Windows
         private int _stepCount;
         private bool _isOpened;
         private long _duration;
-//        private Uri _source = null;
         private string _source = string.Empty;
 
         private IntPtr _hwndParent;

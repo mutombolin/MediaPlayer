@@ -12,6 +12,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Interop;
 using System.Windows.Forms;
+using System.Threading;
 
 using System.Runtime.InteropServices;
 
@@ -42,8 +43,8 @@ namespace MediaPlayer.Windows
         private int _timeShift;
         private int _stepCount;
         private bool _isOpened;
-        private bool _hasTotalTime;
-//        private Uri _source = null;
+        private uint _totalTime = 0;
+        private uint _duration = 0;
         private string _source = string.Empty;
 
         private IntPtr _hwndParent;
@@ -62,6 +63,8 @@ namespace MediaPlayer.Windows
         private System.Windows.Forms.Label _textBlockError = null;
         private System.Windows.Forms.Label _textBlockMessage = null;
 
+        private System.Timers.Timer _searchResumeTimer;
+
         [DllImport("User32.dll", EntryPoint = "SetParent")]
         public static extern IntPtr SetParent(IntPtr hWnd, IntPtr hParent);
 
@@ -79,7 +82,6 @@ namespace MediaPlayer.Windows
             _timeShift = 1;
             _stepCount = 0;
             _isOpened = false;
-            _hasTotalTime = false;
 
             _mediaServer = new PortableDevice.MediaServer();
             _mediaServer.Start();
@@ -113,6 +115,10 @@ namespace MediaPlayer.Windows
             _endTimer.Interval = 300;
             _endTimer.AutoReset = true;
             _endTimer.Elapsed += new System.Timers.ElapsedEventHandler(_endTimer_Elapsed);
+
+            _searchResumeTimer = new System.Timers.Timer();
+            _searchResumeTimer.Interval = 5000;
+            _searchResumeTimer.Elapsed += new System.Timers.ElapsedEventHandler(_searchResumeTimer_Elapsed);
 
             Loaded += new RoutedEventHandler(WinMediaPlayer_Loaded);
         }
@@ -214,10 +220,25 @@ namespace MediaPlayer.Windows
             set
             {
                 _object = value;
-                _hasTotalTime = false;
+                _totalTime = 0;
+
+                if (MediaContentManager.Instance.IsSearching)
+                {
+                    _searchResumeTimer.Stop();
+                    MediaContentManager.Instance.PauseSearch();
+
+                    while (!MediaContentManager.Instance.IsPaused)
+                        Thread.Sleep(100);
+                }
+
                 if (_object != null)
                 {
                     PortableDevice.PortableDeviceFile item = _object as PortableDevice.PortableDeviceFile;
+                    PortableDevice.PortableDevice device = GetDevice(_object);
+
+                    if (_mediaFileType == Managers.MediaFileType.Audio)
+                        _totalTime = device.GetDuration(item);
+
                     if (System.IO.File.Exists(item.Path))
                     {
                         _mediaType = DeviceType.UsbStorage;
@@ -246,6 +267,14 @@ namespace MediaPlayer.Windows
             }
         }
 
+        public uint Duration
+        {
+            get
+            {
+                return _duration;
+            }
+        }
+
         public int PercentProgress
         {
             get
@@ -254,15 +283,21 @@ namespace MediaPlayer.Windows
 
                 try
                 {
-                    double duration = mediaElementMainVideo.currentMedia.duration;
+                    double totalTime = mediaElementMainVideo.currentMedia.duration;
 
-                    if (!(Math.Abs(duration - 0.0) < 0.001)) // Make sure the duration is bigger than 0.0
+                    if (Math.Abs(totalTime - 0.0) < 0.001)
+                        totalTime = _totalTime / 1000;
+
+                    if (!(Math.Abs(totalTime - 0.0) < 0.001)) // Make sure the duration is bigger than 0.0
                     {
-                        _hasTotalTime = true;
-
                         double currentPosition = mediaElementMainVideo.Ctlcontrols.currentPosition;
 
-                        result = (int)(currentPosition / duration * 100.0);
+                        if ((currentPosition < 0) || (currentPosition > totalTime))
+                            currentPosition = 0;
+
+                        _duration = (uint)currentPosition;
+
+                        result = (int)(currentPosition / totalTime * 100.0);
                     }
                 }
                 catch (Exception ex)
@@ -370,6 +405,21 @@ namespace MediaPlayer.Windows
             _stepCount++;
         }
 
+        private void _searchResumeTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            Dispatcher.BeginInvoke(new System.Timers.ElapsedEventHandler(SAFE_searchResumeTimer_Elapsed), sender, e);    
+        }
+
+        private void SAFE_searchResumeTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            _searchResumeTimer.Stop();
+
+            if (!_mediaServer.IsStarted)
+                MediaContentManager.Instance.ResumeSearch();
+            else
+                _searchResumeTimer.Start();
+        }
+
         public void FastForward()
         {
             if (_mediaPlayState != MediaPlayState.Play)
@@ -441,7 +491,8 @@ namespace MediaPlayer.Windows
                 _isFastForward = true;
                 _timeShift = 1;
                 _stepCount = 0;
-                _hasTotalTime = false;
+                _duration = 0;
+                _totalTime = 0;
                 if (_mediaType == DeviceType.PortableDevice)
                     _mediaServer.Stop();
                 _isOpened = false;
@@ -509,7 +560,10 @@ namespace MediaPlayer.Windows
 
         private void SAFE_mediaServer_OnLoadingFinished(object sender, EventArgs e)
         {
-        
+            _searchResumeTimer.Stop();
+
+            if (MediaContentManager.Instance.IsSearching)
+                _searchResumeTimer.Start();
         }
         #endregion
 

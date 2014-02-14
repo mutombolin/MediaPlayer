@@ -19,9 +19,6 @@ namespace PortableDevice
         private bool _isConnected;
         private readonly PortableDeviceClass _device;
 
-        public static Guid WPD_CONTENT_TYPE_AUDIO = new Guid(0x4AD2C85E, 0x5E2D, 0x45E5, 0x88, 0x64, 0x4F, 0x22, 0x9E, 0x3C, 0x6C, 0xF0);
-        public static Guid WPD_CONTENT_TYPE_VIDEO = new Guid(0x9261B03C, 0x3D78, 0x4519, 0x85, 0xE3, 0x02, 0xC5, 0xE1, 0xF5, 0x0B, 0xB9);
-
         public PortableDevice(string deviceId)
         {
             this._device = new PortableDeviceClass();
@@ -43,8 +40,6 @@ namespace PortableDevice
                 IPortableDeviceContent content;
                 IPortableDeviceProperties properties;
                 this._device.Content(out content);
-                content.Cancel();
-
                 content.Properties(out properties);
 
                 // Retrieve the values for the properties
@@ -95,27 +90,67 @@ namespace PortableDevice
 
             IPortableDeviceContent content;
             this._device.Content(out content);
-            content.Cancel();
 
             EnumerateContents(ref content, root);
-
+//            EnumerateFolders(ref content, root);
             return root;
         }
 
-        public PortableDeviceFolder GetContents(PortableDeviceFolder folder)
+        public PortableDeviceFolder GetFolders()
         {
-            PortableDeviceFolder root = folder;
+            var root = new PortableDeviceFolder("DEVICE", "DEVICE");
 
             IPortableDeviceContent content;
             this._device.Content(out content);
 
-            content.Cancel();
-
             EnumerateFolders(ref content, root);
 
-            content.Cancel();
-
             return root;
+        }
+
+        private static void EnumerateFolders(ref IPortableDeviceContent content,
+    PortableDeviceFolder parent)
+        {
+            // Get the properties of the object
+            IPortableDeviceProperties properties;
+            content.Properties(out properties);
+
+            IPortableDeviceKeyCollection keys;
+            properties.GetSupportedProperties(parent.Id, out keys);
+
+            IPortableDeviceValues values;
+            properties.GetValues(parent.Id, keys, out values);
+
+            _tagpropertykey propertyFilter = new _tagpropertykey();
+            Guid contentType = new Guid(0x4AD2C85E, 0x5E2D, 0x45E5, 0x88, 0x64, 0x4F, 0x22, 0x9E, 0x3C, 0x6C, 0xF0);
+            propertyFilter.fmtid = new Guid(0xEF6B490D, 0x5CD8, 0x437A, 0xAF, 0xFC,
+                                      0xDA, 0x8B, 0x60, 0xEE, 0x4A, 0x3C);
+            propertyFilter.pid = 7;
+
+            values.SetGuidValue(propertyFilter, contentType);
+
+            // Enumerate the items contained by the current object
+            IEnumPortableDeviceObjectIDs objectIds;
+            content.EnumObjects(0, parent.Id, values, out objectIds);
+
+            uint fetched = 0;
+            do
+            {
+                string objectId;
+
+                objectIds.Next(1, out objectId, ref fetched);
+                if (fetched > 0)
+                {
+                    var currentObject = WrapObject(properties, objectId);
+
+                    parent.Files.Add(currentObject);
+
+                    if (currentObject is PortableDeviceFolder)
+                    {
+                        EnumerateFolders(ref content, (PortableDeviceFolder)currentObject);
+                    }
+                }
+            } while (fetched > 0);
         }
 
         private static void EnumerateContents(ref IPortableDeviceContent content,
@@ -135,82 +170,18 @@ namespace PortableDevice
                 string objectId;
 
                 objectIds.Next(1, out objectId, ref fetched);
-
-                if (objectId == null)
-                    continue;
-
                 if (fetched > 0)
                 {
                     var currentObject = WrapObject(properties, objectId);
 
-                    if (currentObject != null)
-                    {
-                        parent.Files.Add(currentObject);
+                    parent.Files.Add(currentObject);
 
-                        if (currentObject is PortableDeviceFolder)
-                        {
-                            EnumerateContents(ref content, (PortableDeviceFolder)currentObject);
-                        }
+                    if (currentObject is PortableDeviceFolder)
+                    {
+                        EnumerateContents(ref content, (PortableDeviceFolder)currentObject);
                     }
                 }
             } while (fetched > 0);
-        }
-
-        public static void EnumerateFolders(ref IPortableDeviceContent content,
-            PortableDeviceFolder parent)
-        {
-            // Get the properties of the object
-            IPortableDeviceProperties properties;
-            content.Properties(out properties);
-
-            // Enumerate the items contained by the current object
-            IEnumPortableDeviceObjectIDs objectIds;
-            content.EnumObjects(0, parent.Id, null, out objectIds);
-
-            uint fetched = 0;
-            do
-            {
-                string objectId;
-
-                objectIds.Next(1, out objectId, ref fetched);
-                if (fetched > 0)
-                {
-                    var currentObject = WrapObject(properties, objectId);
-
-                    if (currentObject != null)
-                        parent.Files.Add(currentObject);
-                }
-            } while (fetched > 0);        
-        }
-
-        public uint GetDuration(PortableDeviceFile file)
-        {
-            uint duration = 0;
-
-            IPortableDeviceContent content;
-            this._device.Content(out content);
-
-            content.Cancel();
-
-            IPortableDeviceProperties properties;
-            content.Properties(out properties);
-
-            IPortableDeviceKeyCollection keys;
-            properties.GetSupportedProperties(file.Id, out keys);
-
-            IPortableDeviceValues values;
-            properties.GetValues(file.Id, keys, out values);
-
-            // Get the duration of the object
-            var WPD_MEDIA_DURATION = new _tagpropertykey();
-            WPD_MEDIA_DURATION.fmtid = new Guid(0x2ED8BA05, 0x0AD3, 0x42DC, 0xB0, 0xD0, 0xBC, 0x95, 0xAC, 0x39, 0x6A, 0xC8);
-            WPD_MEDIA_DURATION.pid = 19;
-
-            values.GetUnsignedIntegerValue(WPD_MEDIA_DURATION, out duration);
-
-            System.Diagnostics.Debug.WriteLine(string.Format("name = {0} duration = {1}", file.Name, duration));
-
-            return duration;
         }
 
         public MemoryStream GetMemoryStream(PortableDeviceFile file)
@@ -437,6 +408,8 @@ namespace PortableDevice
                                       0xE1, 0x77, 0x05, 0xA0, 0x5F, 0x85);
             var functionalType = new Guid(0x99ED0160, 0x17FF, 0x4C44, 0x9D, 0x98,
                                           0x1D, 0x7A, 0x6F, 0x94, 0x19, 0x21);
+
+            System.Diagnostics.Debug.WriteLine(string.Format("name = {0} type = 0x{1:X}", name, contentType));
 
             if (contentType == folderType || contentType == functionalType)
             {

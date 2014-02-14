@@ -45,8 +45,11 @@ namespace MediaPlayer
         private MediaPlayerServerState _mediaPlayerServerState;
 
         private string _currentLanguageType = string.Empty;
+        private bool _isVisible = true;
 
         private delegate void delegateUpdateLanguage(string msg);
+        private delegate void delegateUpdateVolume(string msg);
+        private delegate void delegateUpdatePoint(string msg);
 
         #region MediaPlayerServerState
         private enum MediaPlayerServerState
@@ -115,6 +118,11 @@ namespace MediaPlayer
             Loaded += new RoutedEventHandler(MainWindow_Loaded);
             Closed += new EventHandler(MainWindow_Closed);
 
+            if (_isVisible)
+                Show();
+            else
+                Hide();
+
 //            SizeChanged += new SizeChangedEventHandler(MainWindow_SizeChanged);
         }
 
@@ -164,6 +172,8 @@ namespace MediaPlayer
         void mediaPlayerPlayCtrl_StateChange(object sender, EventArgs e)
         {
             // Audio & Video Implement
+            _pipeServer.MediaFileType = WinMediaPlayer.Instance.MediaFileType.ToString();
+
 #if VLC
             if (VLCPlayer.Instance.MediaPlayState == MediaPlayState.Play)
             {
@@ -210,12 +220,9 @@ namespace MediaPlayer
             VLCPlayer.Instance.VideoHeight = mediaPlayerListCtrl.ActualHeight;
             VLCPlayer.Instance.Show();
 #else
-//            WinMediaPlayer.Instance.Width = mediaPlayerListCtrl.ActualWidth;
-//            WinMediaPlayer.Instance.Height = mediaPlayerListCtrl.ActualHeight;
             WinMediaPlayer.Instance.SetWindowSize(new Rect(0, 0, mediaPlayerListCtrl.ActualWidth, mediaPlayerListCtrl.ActualHeight));
-//            WinMediaPlayer.Instance.VideoWidth = mediaPlayerListCtrl.ActualWidth;
-//            WinMediaPlayer.Instance.VideoHeight = mediaPlayerListCtrl.ActualHeight;
             WinMediaPlayer.Instance.Show();
+            WinMediaPlayer.Instance.MediaFileType = MediaFileType.Video;
 #endif
         }
 
@@ -248,6 +255,7 @@ namespace MediaPlayer
 
         void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+/*
             if (!_isStandalone)
             {
                 Hide();
@@ -262,7 +270,7 @@ namespace MediaPlayer
 
                 Show();
             }
-
+*/
 //            string[] args = new string[2] { "MediaPlayer.exe", "lang=ChineseTraditional" };
 //            ProcessArgs(args);
 
@@ -313,8 +321,28 @@ namespace MediaPlayer
         }
 
         public void StartControl()
-        { 
-        
+        {
+
+            if (!_isStandalone)
+            {
+//                Hide();
+
+                this.Left = _left;
+                this.Top = _top;
+
+                Show();
+
+                IntPtr hostHandle = HookWindows.Instance.GetHostHandle("picard", "winworkout");
+                IntPtr guestHandle = new WindowInteropHelper(this).Handle;
+
+                if ((hostHandle != IntPtr.Zero) && (guestHandle != IntPtr.Zero))
+                {
+                    HookWindows.Instance.HookMainWindow(hostHandle, guestHandle);
+                }
+
+                Show();
+            }
+
         }
 
         public void LanguageChanged()
@@ -422,6 +450,10 @@ namespace MediaPlayer
                 {
                     Dispatcher.BeginInvoke(new Action(ShowWindow));
                 }
+                else if (message.ToLower().Contains("stopvideo"))
+                {
+                    Dispatcher.BeginInvoke(new Action(StopVideo));
+                }
                 else if (message.ToLower().Contains("stop"))
                 {
                     Dispatcher.BeginInvoke(new Action(StopWindow));
@@ -437,6 +469,22 @@ namespace MediaPlayer
                 else if (message.ToLower().Contains("lang="))
                 {
                     Dispatcher.BeginInvoke(new delegateUpdateLanguage(UpdateLanguage), message);
+                }
+                else if (message.ToLower().Contains("volume="))
+                {
+                    Dispatcher.BeginInvoke(new delegateUpdateVolume(UpdateVolume), message);
+                }
+                else if (message.ToLower().Contains("startcontrol"))
+                {
+                    Dispatcher.BeginInvoke(new Action(StartControl));
+                }
+                else if (message.ToLower().Contains("targetleft"))
+                {
+                    Dispatcher.BeginInvoke(new delegateUpdatePoint(UpdatePoint), message);
+                }
+                else if (message.ToLower().Contains("targettop"))
+                {
+                    Dispatcher.BeginInvoke(new delegateUpdatePoint(UpdatePoint), message);                
                 }
             }
             catch (Exception ex)
@@ -487,7 +535,9 @@ namespace MediaPlayer
             if (WinMediaPlayer.Instance.MediaFileType == MediaFileType.Video)
             {
                 _isFullScreen = false;
-                WinMediaPlayer.Instance.SetWindowSize(new Rect(0, 0, mediaPlayerListCtrl.ActualWidth, mediaPlayerListCtrl.ActualHeight));
+
+                if (WinMediaPlayer.Instance.MediaPlayState == MediaPlayState.Play)
+                    WinMediaPlayer.Instance.SetWindowSize(new Rect(0, 0, mediaPlayerListCtrl.ActualWidth, mediaPlayerListCtrl.ActualHeight));
             }
         }
 
@@ -518,6 +568,23 @@ namespace MediaPlayer
             }
 
             LanguageChanged();
+        }
+
+        private void UpdateVolume(string msg)
+        {
+            WinMediaPlayer.Instance.MediaPlayerVolume = ExtractNumber(msg.ToLower());
+        }
+
+        private void UpdatePoint(string msg)
+        {
+            if (msg.ToLower().Contains("targetleft"))
+            {
+                _left = ExtractNumber(msg.ToLower());
+            }
+            else if (msg.ToLower().Contains("targettop"))
+            {
+                _top = ExtractNumber(msg.ToLower());
+            }
         }
 
         private void ShowBackground(bool show)
@@ -581,53 +648,12 @@ namespace MediaPlayer
                 {
                     _currentLanguageType = ExtractLanguageType(arg.ToLower());
                 }
-            }
-        }
-        #endregion
-
-        #region Named pipe
-        private void SendPipeCommand(string msg)
-        {
-            NamedPipeClientStream pipeClient = new NamedPipeClientStream(".", PIPE_SERVER_NAME, PipeDirection.Out, PipeOptions.None);
-
-            try
-            {
-                if (pipeClient.IsConnected != null)
-                    pipeClient.Connect(2000);
-
-
-                StreamWriter sw = new StreamWriter(pipeClient);
-
-                try
+                else if (arg.ToLower().Contains("visible="))
                 {
-                    sw.WriteLine(msg);
-                    sw.Flush();
-                    pipeClient.Close();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine(string.Format("{0} - {1} {2}",
-                        System.Reflection.Assembly.GetExecutingAssembly().GetName().Name,
-                        ex,
-                        "Error connecting to Picard"));
+                    if (ExtractNumber(arg.ToLower()) == 0)
+                        _isVisible = false;
                 }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine(string.Format("{0} - {1} {2}",
-                    System.Reflection.Assembly.GetExecutingAssembly().GetName().Name,
-                    ex,
-                    "Error connecting to namemediaplayerserverpipe"));
-            }
-            finally
-            {
-                pipeClient.Close();
-            }
-        }
-
-        private void ApplicationCommand(MediaPlayerServerState state)
-        {
-            SendPipeCommand(state.ToString());
         }
         #endregion
     }
